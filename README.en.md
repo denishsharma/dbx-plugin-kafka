@@ -3,17 +3,32 @@
 [![CI](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/jinpy666/dbx-plugin-kafka?display_name=tag)](https://github.com/jinpy666/dbx-plugin-kafka/releases)
 
-[中文](README.md) · [Repository split notes](docs/REPOSITORY_SPLIT.en.md) · [Kafka MCP reference](docs/MCP.zh-CN.md)
+[中文](README.md) · [Showcase](docs/MEDIA.en.md) · [Feature comparison](docs/COMPARISON.en.md) · [MCP guide](docs/MCP_USAGE.en.md) · [Repository split notes](docs/REPOSITORY_SPLIT.en.md)
 
 DBX Kafka is a visual workspace for Apache Kafka operations and troubleshooting.
-It brings topics, messages, consumer groups, ACLs, and Schema Registry into one
-interface for everyday development, testing, and production administration.
+Open one connection and move from topic inspection to message search, consumer-group
+observation, schema checks, and guarded write operations, then hand the same
+capabilities to AI automation through MCP tools. It turns the next hour after
+“connecting to a cluster” into one coherent, reusable, auditable workflow.
+
+> Topics · Messages · Consumer Groups · Schema Registry: one DBX workspace for everyday Kafka operations.
+
+## Why teams reach for it
+
+| Your job | The DBX Kafka workflow |
+| --- | --- |
+| Inspect clusters and topics quickly | Topics, partitions, ISR, configs, consumer groups, and cluster metadata in one view |
+| Investigate messages and lag | Multi-channel filters, offset strategies, message detail drawer, and consumer-group lag views |
+| Change data with guardrails | Producing, offset resets, and topic/ACL changes stay behind read-only and confirmation gates |
+| Check streaming data | Stream consumption with pause, resume, buffering, and JSON/CSV export |
+| Let AI query Kafka for you | 11 MCP tools reuse connections and permission boundaries; aggregated results save tokens |
 
 ## Use cases
 
-- Confirm topic, partition, consumer-group, and cluster metadata quickly.
-- Investigate payload formats, filters, consumer lag, and offset behavior.
-- Produce messages, adjust offsets, and manage ACLs behind read-only and confirmation safeguards.
+- Confirm topic, partition, consumer-group, and cluster metadata in dev and test environments.
+- Investigate payload formats, filters, consumer lag, and offset behavior without juggling CLI tools.
+- Produce messages, adjust offsets, and manage topics and ACLs behind read-only and delete-confirmation safeguards.
+- Let AI clients reuse saved connections over MCP for routine inspection and troubleshooting.
 
 ## Highlights
 
@@ -29,28 +44,34 @@ interface for everyday development, testing, and production administration.
 - Simplified Chinese, Traditional Chinese, English, Spanish, Italian, Japanese,
   and Portuguese UI.
 
-Workspace screenshots will be added in a later release; the plugin icon lives at
-`assets/plugin.svg`.
+See the [feature and competitor comparison](docs/COMPARISON.en.md) for how this
+positions against kcat, kafka-console-consumer, and popular Kafka web UIs; the
+[showcase page](docs/MEDIA.en.md) collects copy-ready messaging.
 
 ## MCP automation
 
-Start standalone stdio mode with:
+Use the DBX MCP bridge to reuse saved connections, credential resolution, and
+permission policy. For standalone access:
 
 ```bash
 backend/bin/dbx-plugin-kafka --mcp
 ```
 
-Kafka MCP is read-only by default. Useful tools include `kafka_messages_digest`,
-`kafka_cursor_next`, `kafka_messages_produce`, and consumer-group offset tools.
-Producing requires `readOnly: false`; deletion and clearing also require
-`allowDelete: true`. See the [Kafka MCP reference](docs/MCP.zh-CN.md).
+Kafka MCP is read-only by default and ships 11 tools: `kafka_messages_digest`
+(local aggregation with cursor paging), `kafka_cursor_next`,
+`kafka_messages_produce`, `kafka_groups_offsets_reset`, `kafka_topics_delete`,
+`kafka_topics_records_clear`, plus five UI tools. Producing requires
+`readOnly: false`; deletion and clearing also require `allowDelete: true` and a
+two-phase confirmation. See the [MCP guide](docs/MCP_USAGE.en.md) and the
+[Kafka MCP reference](docs/MCP.zh-CN.md) for configuration and safety details.
 
 ## Security
 
 SASL, TLS, Kerberos, AWS, and Schema Registry credentials are managed through DBX
 host secret bindings and are not persisted by the plugin. For production clusters,
 prefer TLS, read-only mode, and least-privilege ACLs; require confirmation for
-topic, consumer-group, and ACL deletion operations.
+topic, consumer-group, and ACL deletion operations. MCP write tools enforce a
+preview → confirmToken two-phase flow and are recorded in the audit log.
 
 ## Install
 
@@ -69,6 +90,16 @@ python3 scripts/validate_repo.py && node scripts/connection-forms/verify.mjs kaf
 scripts/test.sh
 ```
 
-Protocol, Schema Registry, and integration details live under `docs/`. The
-repository split notes describe the split boundary, vendored dependencies, and
-release preconditions for this standalone repository.
+Start a local Kafka/Schema Registry test cluster with `scripts/dev-cluster.sh`
+(Docker); run the MCP smoke with `python3 scripts/smoke_mcp.py` (container
+scenarios honestly SKIP when their environment is absent).
+
+## Documentation
+
+- [Implementation plan](docs/IMPL_PLAN_DBX_KAFKA.zh-CN.md): scope and iteration log.
+- [Protocol reference](docs/PROTOCOL_KAFKA.zh-CN.md): sidecar methods and events.
+- [Kafka MCP reference](docs/MCP.zh-CN.md): tool contracts, inline credentials, and the app-bridge fallback.
+- [MCP guide](docs/MCP_USAGE.en.md) / [Chinese](docs/MCP_USAGE.zh-CN.md): onboarding and common pitfalls.
+- [Showcase](docs/MEDIA.en.md) / [Chinese](docs/MEDIA.zh-CN.md): copy-ready messaging.
+- [Feature comparison](docs/COMPARISON.en.md) / [Chinese](docs/COMPARISON.zh-CN.md): positioning against alternatives.
+- [Repository split notes](docs/REPOSITORY_SPLIT.en.md) / [Chinese](docs/REPOSITORY_SPLIT.zh-CN.md).
