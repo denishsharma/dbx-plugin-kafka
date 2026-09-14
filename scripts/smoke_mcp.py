@@ -791,6 +791,10 @@ class McpStdioClient:
         buffer — the data is there but the pipe is empty, which looks exactly
         like a lost response (K17 flake root cause, ldap M18 同源). So:
         os.read + our own line buffer, never the buffered reader.
+
+        On Windows select() only accepts sockets, so the raw read runs in a
+        daemon thread and the deadline is enforced on the queue wait (same
+        pattern as sidecar_client_jsonl._read_line).
         """
         while True:
             index = self._rawbuf.find(b"\n")
@@ -801,10 +805,27 @@ class McpStdioClient:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise SidecarError("timeout waiting for MCP stdio response")
-            ready, _, _ = select.select([self.process.stdout.fileno()], [], [], remaining)
-            if not ready:
-                raise SidecarError("timeout waiting for MCP stdio response")
-            chunk = os.read(self.process.stdout.fileno(), 65536)
+            if os.name == "nt":
+                import queue as _queue
+
+                chunks: "_queue.Queue[bytes]" = _queue.Queue()
+
+                def _reader() -> None:
+                    try:
+                        chunks.put(os.read(self.process.stdout.fileno(), 65536))
+                    except (OSError, ValueError):
+                        chunks.put(b"")
+
+                threading.Thread(target=_reader, daemon=True).start()
+                try:
+                    chunk = chunks.get(timeout=remaining)
+                except _queue.Empty:
+                    raise SidecarError("timeout waiting for MCP stdio response")
+            else:
+                ready, _, _ = select.select([self.process.stdout.fileno()], [], [], remaining)
+                if not ready:
+                    raise SidecarError("timeout waiting for MCP stdio response")
+                chunk = os.read(self.process.stdout.fileno(), 65536)
             if not chunk:
                 raise SidecarError("MCP stdio sidecar closed stdout")
             self._rawbuf += chunk
