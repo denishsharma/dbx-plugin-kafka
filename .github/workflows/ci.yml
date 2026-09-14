@@ -20,6 +20,7 @@ jobs:
   validate:
     name: Validate repository contracts
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,6 +35,7 @@ jobs:
   frontend:
     name: Frontend checks
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -60,11 +62,13 @@ jobs:
   backend:
     name: Go sidecar checks
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: 1.24.x
+          cache-dependency-path: backend/go.sum
       # Module downloads need the network; go.sum pins every version. The
       # vendored SDK (shared/sdk/go/dbx-plugin-sdk) is resolved through the
       # backend/go.mod replace, no host checkout required.
@@ -73,6 +77,7 @@ jobs:
   candidate:
     name: Package candidate (${{ matrix.target }})
     needs: [validate, frontend, backend]
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -114,6 +119,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: 1.24.x
+          cache-dependency-path: backend/go.sum
       # Warm the module/download caches once so build.sh's go build and the
       # CLI's own rebuild of the sidecar both run offline-fast.
       - name: Pre-download Go modules
@@ -148,6 +154,7 @@ jobs:
     name: Cross-target candidate checks
     needs: [candidate]
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
