@@ -58,6 +58,7 @@ def main() -> int:
         fail("scripts/build.sh must inject main.version from the manifest at build/package time")
 
     required = [
+        ".dbx-store.json",
         "assets/plugin.svg",
         "frontend/package.json",
         "backend/go.mod",
@@ -78,7 +79,16 @@ def main() -> int:
         if not (ROOT / relative).exists():
             fail(f"missing required path: {relative}")
 
-    print(f"PASS repository identity: {manifest['id']} {version}; standalone paths and vendored SDK present")
+    store = json.loads((ROOT / ".dbx-store.json").read_text(encoding="utf-8"))
+    if store.get("permissions") != manifest.get("permissions"):
+        fail(".dbx-store.json permissions must match manifest.json permissions")
+    icon = store.get("icon", "")
+    if not icon or not (ROOT / icon).exists():
+        fail(f".dbx-store.json icon must point at an existing asset: {icon!r}")
+    if store.get("homepage") != manifest.get("homepage") or store.get("source") != manifest.get("source"):
+        fail(".dbx-store.json source/homepage must match manifest.json")
+
+    print(f"PASS repository identity: {manifest['id']} {version}; standalone paths, store entry, and vendored SDK present")
     return 0
 
 

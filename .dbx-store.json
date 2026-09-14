@@ -1,0 +1,25 @@
+{
+  "name": "DBX Kafka",
+  "description": "Operate Apache Kafka from one workspace: inspect topics and partitions, produce and consume messages, filter and decode payloads, monitor consumer lag, manage offsets and ACLs, stream records, and export results.",
+  "icon": "assets/plugin.svg",
+  "tags": [
+    "kafka",
+    "streaming",
+    "messaging",
+    "schema-registry"
+  ],
+  "permissions": [
+    "host.events",
+    "host.workbench"
+  ],
+  "source": "https://github.com/jinpy666/dbx-plugin-kafka",
+  "homepage": "https://github.com/jinpy666/dbx-plugin-kafka",
+  "license": "MIT",
+  "releaseNotes": "首个商店版本：在一个 DBX 工作台中管理 Apache Kafka——topic/分区/消费组巡检、消息生产与消费（本地聚合 digest、cursor 翻页与流式导出）、消费组 lag 监控与受控 offset 重置、topic/ACL 运维，支持 PLAINTEXT/TLS/SASL（PLAIN/SCRAM）、Kerberos、OAUTHBEARER 与 Confluent/AWS Glue Schema Registry；写操作受只读、allowDelete 与两阶段确认保护，并提供 11 个 MCP 工具供 AI 自动化调用。",
+  "localizations": {
+    "zh-CN": {
+      "name": "DBX Kafka",
+      "description": "在一个工作台中管理 Apache Kafka：查看 topic 与分区、生产和消费消息、过滤与解码 payload、监控消费组 lag、管理 offset 和 ACL、流式消费并导出结果。"
+    }
+  }
+}
