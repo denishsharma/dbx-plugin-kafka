@@ -17,7 +17,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
 fi
 
 echo "==> frontend typecheck + tests + build"
-node ../shared/connection-forms/verify.mjs kafka
+node scripts/connection-forms/verify.mjs kafka
 [ -d frontend/node_modules ] || pnpm --dir frontend install
 pnpm --dir frontend typecheck
 pnpm --dir frontend test
@@ -38,12 +38,12 @@ if [ -f manifest.json ]; then
   unset DBX_PLUGIN_SDK_ROOT
   # Same native-CLI direct call as build.sh: the npm wrapper injects
   # DBX_PLUGIN_SDK_ROOT whose bundled go.work is pinned to go 1.22 and breaks
-  # modules requiring >=1.24.
-  CLI_PKG="$(npm root -g 2>/dev/null)/@dbx-app/plugin-cli"
-  NATIVE_CLI="$CLI_PKG/node_modules/@dbx-app/plugin-cli-darwin-arm64/bin/dbx-plugin"
-  if [ -x "$NATIVE_CLI" ]; then
+  # modules requiring >=1.24. Platform suffix resolved per-machine.
+  . scripts/cli-platform.sh
+  if NATIVE_CLI="$(resolve_native_plugin_cli)"; then
     env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 "$NATIVE_CLI" package .
   elif command -v dbx-plugin >/dev/null 2>&1; then
+    echo "WARN: native plugin-cli for $(uname -s)/$(uname -m) not found; falling back to the npm wrapper" >&2
     env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 dbx-plugin package .
   else
     echo "SKIP: dbx-plugin CLI not available"

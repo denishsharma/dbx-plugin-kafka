@@ -42,22 +42,30 @@ PLUGIN_VERSION="${PLUGIN_VERSION:-0.0.0-dev}"
 # Build the Go sidecar first when the backend workspace is present.
 # backend/bin is for local smoke/debug; the packaging CLI rebuilds the sidecar
 # itself (build_go_backend runs plain `go build`, no ldflags support), so the
-# same version is injected into that rebuild via GOFLAGS below.
+# same version is injected into that rebuild via GOFLAGS below. The local
+# output keeps a Windows .exe suffix so the offline smoke can execute it on
+# every CI platform.
+SIDECAR_BIN="bin/dbx-plugin-kafka"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) SIDECAR_BIN="bin/dbx-plugin-kafka.exe" ;;
+esac
 if [ -f backend/go.mod ] && command -v go >/dev/null 2>&1; then
   echo "==> backend: go build (owned by backend path; failures are recorded in docs/PROGRESS-B-KAFKA.zh-CN.md)"
-  (cd backend && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${PLUGIN_VERSION}" -o bin/dbx-plugin-kafka .) || {
+  (cd backend && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${PLUGIN_VERSION}" -o "$SIDECAR_BIN" .) || {
     echo "WARN: go build failed (backend under parallel development); packaging will fail until it is green"
   }
 fi
 
 # The npm CLI wrapper injects DBX_PLUGIN_SDK_ROOT (bundled SDK ships a go.work
 # pinned to go 1.22, which breaks modules requiring >=1.24). Call the native
-# binary directly without SDK_ROOT so the local Go toolchain is used.
-CLI_PKG="$(npm root -g 2>/dev/null)/@dbx-app/plugin-cli"
-NATIVE_CLI="$CLI_PKG/node_modules/@dbx-app/plugin-cli-darwin-arm64/bin/dbx-plugin"
-if [ -x "$NATIVE_CLI" ]; then
+# binary directly without SDK_ROOT so the local Go toolchain is used. The
+# platform package suffix is resolved per-machine (linux uses a -gnu suffix),
+# so cross-platform CI never falls back to the wrapper.
+. scripts/cli-platform.sh
+if NATIVE_CLI="$(resolve_native_plugin_cli)"; then
   env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 GOFLAGS="-ldflags=-X=main.version=${PLUGIN_VERSION}" "$NATIVE_CLI" package .
 else
+  echo "WARN: native plugin-cli for $(uname -s)/$(uname -m) not found; falling back to the npm wrapper (its bundled SDK may conflict with backend go.mod)" >&2
   env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 GOFLAGS="-ldflags=-X=main.version=${PLUGIN_VERSION}" dbx-plugin package .
 fi
 
