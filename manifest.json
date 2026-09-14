@@ -6,8 +6,8 @@
   "version": "0.1.38",
   "publisher": "dbx",
   "description": "Operate Apache Kafka from one workspace: inspect topics and partitions, produce and consume messages, filter and decode payloads, monitor consumer lag, manage offsets and ACLs, stream records, and export results.",
-  "source": "https://github.com/jinpy666/dbx-plugins",
-  "homepage": "https://github.com/jinpy666/dbx-plugins/tree/main/kafka",
+  "source": "https://github.com/jinpy666/dbx-plugin-kafka",
+  "homepage": "https://github.com/jinpy666/dbx-plugin-kafka",
   "icon": "assets/plugin.svg",
   "engines": {
     "dbx": ">=0.5.77",

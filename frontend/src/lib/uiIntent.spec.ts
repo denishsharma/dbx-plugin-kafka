@@ -3,7 +3,7 @@
 // 行为成立（事件归一化 + intent 分派 + report 回报），并镜像 mockDbxHost
 // 的新事件/方法形状（防单测脱节，AGENTS.md 硬性规则 7）。
 import { describe, expect, it, vi } from "vitest";
-import { readUiIntentEvent, useUiIntent } from "../../../../shared/frontend/uiIntent";
+import { readUiIntentEvent, useUiIntent } from "../../../shared/frontend/uiIntent";
 import { emitKafkaUiIntent } from "../mockDbxHost";
 import "../mockDbxHost";
 

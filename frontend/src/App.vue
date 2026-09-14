@@ -12,7 +12,7 @@ import { kafkaApi, setKafkaConnectionId, type KafkaStreamErrorEvent, type KafkaS
 import { friendlyKafkaError } from "./lib/kafkaErrors";
 import { decideModalKeydown, focusableElements } from "./lib/kafkaModel";
 import { parseAuditEvent, pushAuditItem, type AuditFeedItem } from "./lib/auditFeed";
-import { useUiIntent, type UiIntentOutcome } from "../../../shared/frontend/uiIntent";
+import { useUiIntent, type UiIntentOutcome } from "../../shared/frontend/uiIntent";
 import TopicTree from "./components/TopicTree.vue";
 import MessagesPanel from "./components/MessagesPanel.vue";
 import StreamPanel from "./components/StreamPanel.vue";

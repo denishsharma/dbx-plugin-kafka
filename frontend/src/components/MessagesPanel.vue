@@ -61,7 +61,7 @@ import {
   type ValueFormat,
 } from "../lib/kafkaModel";
 import { t } from "../lib/i18n";
-import type { UiIntentOutcome, UiIntentSummary } from "../../../../shared/frontend/uiIntent";
+import type { UiIntentOutcome, UiIntentSummary } from "../../../shared/frontend/uiIntent";
 
 const props = defineProps<{
   topic: string;

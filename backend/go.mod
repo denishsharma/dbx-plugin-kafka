@@ -45,8 +45,8 @@ require (
 	golang.org/x/net v0.49.0 // indirect
 )
 
-// SDK 不在公网 module proxy 上（unknown revision），本地构建指向宿主 worktree
-// 的 SDK 源码（与 CLI npm 包 sdk-root 内容一致，M0 文档 §1.3）。
+// SDK vendored 以便独立 checkout 构建（shared/sdk/go/dbx-plugin-sdk，拆分基线
+// 见 docs/REPOSITORY_SPLIT.zh-CN.md；不在公网 module proxy 上，unknown revision）。
 // `dbx-plugin package` 打包时 CLI 会通过 DBX_PLUGIN_SDK_ROOT + go.work 注入
 // 自己的解析路径，此 replace 不影响打包。
-replace github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk => ../../../dbx-plugin-host-worktree/plugins/sdk/go/dbx-plugin-sdk
+replace github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk => ../shared/sdk/go/dbx-plugin-sdk

@@ -1,12 +1,13 @@
 # DBX Kafka
 
-[中文](README.md) · [Workspace contribution guide](../CONTRIBUTING.md)
+[![CI](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/jinpy666/dbx-plugin-kafka?display_name=tag)](https://github.com/jinpy666/dbx-plugin-kafka/releases)
+
+[中文](README.md) · [Repository split notes](docs/REPOSITORY_SPLIT.en.md) · [Kafka MCP reference](docs/MCP.zh-CN.md)
 
 DBX Kafka is a visual workspace for Apache Kafka operations and troubleshooting.
 It brings topics, messages, consumer groups, ACLs, and Schema Registry into one
 interface for everyday development, testing, and production administration.
-
-![DBX plugin center](../shared/host-e2e/screenshots/02-plugin-center.png)
 
 ## Use cases
 
@@ -28,8 +29,8 @@ interface for everyday development, testing, and production administration.
 - Simplified Chinese, Traditional Chinese, English, Spanish, Italian, Japanese,
   and Portuguese UI.
 
-A Kafka-specific workspace screenshot will be added when the stable host UI capture
-set is prepared; the current image shows the DBX plugin center and unified install entry point.
+Workspace screenshots will be added in a later release; the plugin icon lives at
+`assets/plugin.svg`.
 
 ## MCP automation
 
@@ -42,8 +43,7 @@ backend/bin/dbx-plugin-kafka --mcp
 Kafka MCP is read-only by default. Useful tools include `kafka_messages_digest`,
 `kafka_cursor_next`, `kafka_messages_produce`, and consumer-group offset tools.
 Producing requires `readOnly: false`; deletion and clearing also require
-`allowDelete: true`. See the [MCP guide](../docs/MCP_USAGE.en.md) and the
-[Kafka MCP reference](docs/MCP.zh-CN.md).
+`allowDelete: true`. See the [Kafka MCP reference](docs/MCP.zh-CN.md).
 
 ## Security
 
@@ -52,14 +52,23 @@ host secret bindings and are not persisted by the plugin. For production cluster
 prefer TLS, read-only mode, and least-privilege ACLs; require confirmation for
 topic, consumer-group, and ACL deletion operations.
 
+## Install
+
+Download the `.dbxp` package for your platform from
+[GitHub Releases](https://github.com/jinpy666/dbx-plugin-kafka/releases) and
+install it locally from the DBX plugin center. Developers can build candidate
+packages by following the [repository split notes](docs/REPOSITORY_SPLIT.en.md).
+
 ## Development
 
 ```bash
-cd frontend && pnpm install && pnpm typecheck && pnpm test && pnpm build
-cd ../backend && go vet ./... && go test ./...
-cd ..
+pnpm --dir frontend install
+pnpm --dir frontend typecheck && pnpm --dir frontend test && pnpm --dir frontend build
+(cd backend && go vet ./... && go test ./...)
+python3 scripts/validate_repo.py && node scripts/connection-forms/verify.mjs kafka
 scripts/test.sh
 ```
 
-Protocol, Schema Registry, and integration details live under `docs/`. Contributors
-should read the [workspace contribution guide](../CONTRIBUTING.md) first.
+Protocol, Schema Registry, and integration details live under `docs/`. The
+repository split notes describe the split boundary, vendored dependencies, and
+release preconditions for this standalone repository.

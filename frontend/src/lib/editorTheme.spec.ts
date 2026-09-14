@@ -4,7 +4,7 @@
 // 源码中的暗色取值与 shared 调色板一致，防止两侧漂移。
 import { describe, expect, it } from "vitest";
 import CodeEditorSource from "../components/CodeEditor.vue?raw";
-import { EDITOR_TOKEN_COLORS } from "../../../../shared/frontend/editorTheme";
+import { EDITOR_TOKEN_COLORS } from "../../../shared/frontend/editorTheme";
 
 // 提取暗色规则块（明暗分支统一双属性匹配 data-theme / data-dbx-theme）。
 const darkBlock = /:root\[data-dbx-theme="dark"\] \.dbx-code-editor \{([\s\S]*?)\n\}/.exec(CodeEditorSource)?.[1];
