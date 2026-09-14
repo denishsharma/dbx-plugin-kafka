@@ -118,27 +118,52 @@ class SidecarClient:
 
         select() on the raw fd instead of a plain readline(): readline() has
         no timeout, so an idle stream session (no lines at all) would block
-        this reader forever even past the deadline.
+        this reader forever even past the deadline. On Windows select() only
+        accepts sockets, so the read runs in a daemon thread and the deadline
+        is enforced on the queue wait (same pattern as the ssh smoke's
+        _readline_timeout).
         """
         import os as _os
-        import selectors as _selectors
 
+        stdout = self.process.stdout
+        assert stdout is not None
         buffer: bytes = getattr(self, "_read_buf", b"")
         while b"\n" not in buffer:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 self._read_buf = buffer
                 raise SidecarError("timeout waiting for sidecar line")
-            selector = _selectors.DefaultSelector()
-            selector.register(self.process.stdout.raw, _selectors.EVENT_READ)  # type: ignore[union-attr]
-            try:
-                ready = selector.select(timeout=remaining)
-            finally:
-                selector.close()
-            if not ready:
-                self._read_buf = buffer
-                raise SidecarError("timeout waiting for sidecar line")
-            chunk = _os.read(self.process.stdout.fileno(), 65536)
+            if _os.name == "nt":
+                import queue as _queue
+                import threading as _threading
+
+                chunks: "_queue.Queue[bytes]" = _queue.Queue()
+
+                def _reader() -> None:
+                    try:
+                        chunks.put(_os.read(stdout.fileno(), 65536))
+                    except (OSError, ValueError):
+                        chunks.put(b"")
+
+                _threading.Thread(target=_reader, daemon=True).start()
+                try:
+                    chunk = chunks.get(timeout=remaining)
+                except _queue.Empty:
+                    self._read_buf = buffer
+                    raise SidecarError("timeout waiting for sidecar line")
+            else:
+                import selectors as _selectors
+
+                selector = _selectors.DefaultSelector()
+                selector.register(stdout.raw, _selectors.EVENT_READ)  # type: ignore[union-attr]
+                try:
+                    ready = selector.select(timeout=remaining)
+                finally:
+                    selector.close()
+                if not ready:
+                    self._read_buf = buffer
+                    raise SidecarError("timeout waiting for sidecar line")
+                chunk = _os.read(stdout.fileno(), 65536)
             if not chunk:
                 raise SidecarError("sidecar closed stdout")
             buffer += chunk
