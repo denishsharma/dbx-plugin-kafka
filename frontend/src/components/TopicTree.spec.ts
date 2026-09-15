@@ -120,7 +120,8 @@ describe("TopicTree keyboard navigation (roving tabindex)", () => {
     replicationFactor: 1,
   }));
 
-  it("renders listbox semantics with exactly one tab stop (507-node big mode guard)", () => {
+  // 507 节点在全套件并行时渲染可超过默认 5s，放宽超时避免假失败（CI 实测）。
+  it("renders listbox semantics with exactly one tab stop (507-node big mode guard)", { timeout: 20_000 }, () => {
     const wrapper = mount(TopicTree, { props: { topics: bigTopics, loading: false, error: "", selectedTopic: "" } });
     const listbox = wrapper.find(".tree-node");
     expect(listbox.attributes("role")).toBe("listbox");
