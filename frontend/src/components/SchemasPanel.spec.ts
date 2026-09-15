@@ -312,4 +312,31 @@ describe("SchemasPanel register submit (schemaWrite)", () => {
     expect((wrapper.find('[data-testid="register-normalize"]').element as HTMLInputElement).checked).toBe(false);
     expect((wrapper.find(".modal-backdrop .modal textarea").element as HTMLTextAreaElement).value).toBe(AVRO_V1);
   });
+
+  // 回归：register 成功后 selectSubject 只读 row.subject。
+  // 修复前成功回调传 { raw: { subject } } 形状，row.subject 为 undefined →
+  // 选中被清空、versions/list 不再为新 subject 发起。
+  it("keeps the newly registered subject selected after register (reselect regression)", async () => {
+    installBridge(registerBridge());
+    const wrapper = mountPanel();
+    await flushPromises();
+    await wrapper.findAll(".qb-add")[0].trigger("click"); // 注册按钮
+    await flushPromises();
+    await wrapper.find('[data-testid="insert-template"]').trigger("click"); // 预填合法 AVRO
+    await flushPromises();
+    const versionsCallsFor = (subject: string) =>
+      invokeMock.mock.calls.filter(
+        ([method, params]) => method === "kafka/schema/versions/list" && (params as Record<string, unknown>).subject === subject,
+      ).length;
+    expect(versionsCallsFor("new-subject-value")).toBe(0);
+
+    await wrapper.find(".modal-backdrop .modal .settings-body input[type='text']").setValue("new-subject-value");
+    await wrapper.findAll(".modal-backdrop .modal footer .primary-button")[0].trigger("click");
+    await flushPromises();
+
+    // 修复后：提交成功 → loadSubjects + selectSubject({ subject }) → 新 subject 的版本表重新加载。
+    expect(versionsCallsFor("new-subject-value")).toBeGreaterThanOrEqual(1);
+    // 选中未被清空：版本表已渲染新 subject 的版本行（bridge 对未知 subject 走 AVRO 双版本兜底）。
+    expect(wrapper.findAll(".grid-stub[data-key='schema-versions'] .grid-stub-row").length).toBeGreaterThan(0);
+  });
 });
