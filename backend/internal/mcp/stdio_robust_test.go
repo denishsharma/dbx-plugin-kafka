@@ -110,7 +110,7 @@ func TestStdioRobustRequestShapes(t *testing.T) {
 }
 
 // S-STDIO-R4 超长行：8 MiB arguments 的 tools/call → 工具层结构化报错
-//（连接门引导错误，不 panic 不挂死）；超 maxRequestLineBytes 的行 → -32700
+// （连接门引导错误，不 panic 不挂死）；超 maxRequestLineBytes 的行 → -32700
 // 拒绝；之后 ping 存活。
 func TestStdioRobustOversizedLines(t *testing.T) {
 	server := newTestStdioServer()

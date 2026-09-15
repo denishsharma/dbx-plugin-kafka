@@ -167,7 +167,7 @@ func (s *StdioServer) Serve(in io.Reader, out io.Writer) error {
 
 // handleLine 处理一行 JSON-RPC：返回要写回的响应；通知类（notifications/*，
 // 含未知通知名与缺 id 通知）返回 nil 不回包。请求形状按 JSON-RPC 分档
-//（MCP_ACCEPTANCE §2）：解析失败 -32700、非法请求（缺 id / method 缺失或
+// （MCP_ACCEPTANCE §2）：解析失败 -32700、非法请求（缺 id / method 缺失或
 // 非字符串 / id 为 object/array / jsonrpc 版本非 2.0）-32600——全部结构化
 // 报错，进程不崩（ldap 同构）。纯分派、无 I/O，单测直接喂行。
 func (s *StdioServer) handleLine(line []byte) map[string]any {
