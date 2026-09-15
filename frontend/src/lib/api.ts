@@ -550,10 +550,12 @@ export const kafkaApi = {
       registry ? { ...base, registry } : base,
     );
   },
-  schemaRegister(subject: string, format: SchemaFormat, schema: string, registry?: SchemaRegistryProvider) {
+  schemaRegister(subject: string, format: SchemaFormat, schema: string, registry?: SchemaRegistryProvider, normalize?: boolean) {
+    const base: Record<string, unknown> = { subject, format, schema };
+    if (normalize) base.normalize = true;
     return callKafka<SchemaRegisterResult>(
       "kafka/schema/register",
-      registry ? { subject, format, schema, registry } : { subject, format, schema },
+      registry ? { ...base, registry } : base,
     );
   },
   schemaDelete(subject: string, registry?: SchemaRegistryProvider) {
