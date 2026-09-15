@@ -1,0 +1,34 @@
+version: 1
+plugin: dbx-plugin-kafka
+base_branch: main
+branch_prefix: codex/kafka/
+workflow:
+  stages: [discovery, contract, implementation, review, integration, verification]
+  merge_policy: integrator_only
+  implementation_isolation: one_branch_per_agent
+  dependencies:
+    implementation: [contract]
+    review: [implementation]
+    integration: [review]
+    verification: [integration]
+ownership:
+  contract: [manifest.json, docs/PROTOCOL.zh-CN.md]
+  backend: [backend/]
+  frontend: [frontend/, manifest.json]
+  tests: [scripts/]
+  integrator: [ui/, dist/, version_metadata, shared_contract_docs]
+validation:
+  local:
+    - python3 scripts/validate_repo.py
+    - node scripts/connection-forms/verify.mjs kafka
+    - pnpm --dir frontend typecheck
+    - pnpm --dir frontend test
+    - pnpm --dir frontend build
+    - '(cd backend && gofmt -l main.go internal | test -z "$(cat)" )'
+    - '(cd backend && go vet ./... && go test ./...)'
+  ci_required: [validate, frontend, backend, integration, candidates-check]
+security:
+  secrets: ephemeral_only
+  production_access: forbidden
+  generated_artifacts: integrator_only
+
