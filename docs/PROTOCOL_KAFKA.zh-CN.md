@@ -377,11 +377,18 @@ Registry 管理面（Phase 3，见文末 **Phase 3（AWS Glue）** 小节）。�
 
 **`kafka/schema/register`**（写，过 read_only；非 allow_delete 级）
 
-- 请求：`subject:string`、`format:string`、`schema:string`、
-  `references?`。幂等：SR 对重复 schema 返回既有 id。
-- 返回：`{id:int, version:int}`（version 为注册后 latest；回读失败时为 0）。
+- 请求：`subject:string`、`format:string`、`schema:string`、`references?`、
+  `normalize?:bool`（缺省 `false`；`true` 时以
+  `POST /subjects/{subject}/versions?normalize=true` 注册，由 SR 归一化
+  存储文本——仅 confluent 后端支持）。幂等：SR 对重复 schema 返回既有
+  id。create/update 同一方法：为新 subject 注册即建第一版，为已有
+  subject 注册即追加新版本（前端"克隆"= 用选中版本内容预填注册表单，
+  无独立后端方法）。
+- 返回：`{id:int, version:int, versionId?:string}`（version 为注册后
+  latest；回读失败时为 0；`versionId` 仅 glue 后端填充）。
 - 错误：read_only → `-32000`（blocked）；SR 拒绝（schema 无效/
-  兼容性不过）→ `-32000`；审计。
+  兼容性不过）→ `-32000`；glue 后端 + `normalize=true` → `-32000`
+  （明确不支持报错，不静默忽略）；审计。
 
 **`kafka/schema/delete`**（critical：过 allow_delete + read_only）
 
@@ -440,6 +447,8 @@ DeleteSchemaVersions / DeleteSchema）：
   版本；请求可选 `compatibility` 指定初始级别，缺省 `NONE`；`references`
   为 Confluent 概念、Glue 忽略）；存在 → RegisterSchemaVersion（幂等：
   Glue 对重复定义返回既有版本）。返回 `{id:0, version, versionId}`。
+  `normalize=true` → `-32000`（Glue 无归一化语义，明确报错不静默忽略，
+  且不发起任何 Glue 调用）。
 - **delete/version** = DeleteSchemaVersions（单版本区间）；返回
   `{deletedVersions:[version]}`（SDK 未建模被删版本号清单，按错误清单折算，
   Glue 报版本删除错误 → `-32000` 透传）。**delete**（subject 整删）=
