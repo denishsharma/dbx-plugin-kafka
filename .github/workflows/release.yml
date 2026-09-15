@@ -1,4 +1,4 @@
-name: Release DBX Kafka plugin
+name: Release Kafka Studio plugin
 
 on:
   release:
