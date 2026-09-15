@@ -10,7 +10,7 @@
 // 并行开发期守卫：frontend/mock.html 尚未落地或应用挂载点缺失时整体 SKIP
 // （规则 5：并行开发期不阻塞其他路），frontend 就绪后走查即生效。
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { platform } from "node:os";
 import path from "node:path";
@@ -45,10 +45,18 @@ async function waitForServer(url, timeoutMs = 30000) {
 }
 
 async function loadPlaywrightCore() {
+  // A stale/corrupt deps dir (interrupted install, partial upgrade) must
+  // self-heal instead of crashing: any require failure wipes the dir and
+  // falls through to a fresh install below.
   for (const candidate of [path.join(DEPS_DIR, "node_modules", "playwright-core")]) {
     if (existsSync(candidate)) {
-      const require = createRequire(path.join(candidate, "index.js"));
-      return require("playwright-core");
+      try {
+        const require = createRequire(path.join(candidate, "index.js"));
+        return require("playwright-core");
+      } catch {
+        console.log(`==> stale playwright-core in ${DEPS_DIR}; reinstalling`);
+        rmSync(DEPS_DIR, { recursive: true, force: true });
+      }
     }
   }
   console.log(`==> installing playwright-core into ${DEPS_DIR} (non-project dependency)`);

@@ -1,5 +1,5 @@
 # Local Apache Kafka (KRaft, single node) container for scripts/smoke_container.py
-# (scenarios S1-S10). PLAINTEXT only: there are no credentials in this setup, so
+# (scenarios S1-S15). PLAINTEXT only: there are no credentials in this setup, so
 # no secret environment variable is required; if a SASL/TLS variant is added
 # later, every secret must come from the environment via ${VAR:?export VAR ...}.
 #
@@ -9,6 +9,26 @@
 # delete against http://127.0.0.1:19081 (broker on 127.0.0.1:19092, so the
 # main apache/kafka 9092 stays untouched). SASL is off and there are no
 # credentials anywhere in this setup.
+#
+# SASL variant (S16, connection-form matrix end-to-end): dbx-kafka-sasl-test is
+# a second single-node apache/kafka cluster exposing a SASL_PLAINTEXT listener
+# with the PLAIN mechanism on 127.0.0.1:29092. Unlike the PLAINTEXT services above,
+# this setup has real credentials, so they must come from the environment:
+#   KAFKA_TEST_SASL_ADMIN_PASSWORD  inter-broker/admin login password
+#   KAFKA_TEST_SASL_PASSWORD        password of the "smoke" client user
+# scripts/smoke_container.py exports throwaway defaults for both before
+# invoking compose, so plain `python3 scripts/smoke_container.py` keeps working;
+# calling docker compose directly requires exporting them explicitly.
+#
+# TLS variant (S17, connection-form matrix end-to-end): dbx-kafka-tls-test is a
+# third single-node cluster with an SSL listener on 127.0.0.1:30092 and
+# ssl.client.auth=required (mTLS). The PKCS12 keystore/truststore plus the
+# client PEM pair are throwaway certificates that scripts/smoke_container.py
+# generates with openssl into a temp directory passed as:
+#   KAFKA_TEST_TLS_SECRETS_DIR      host dir mounted at /etc/kafka/secrets
+# The apache/kafka image reads the store passwords from the *_CREDENTIALS
+# files inside that directory (keystore.password / truststore.password), so
+# no password env vars exist here.
 services:
   kafka-test:
     image: apache/kafka:latest
@@ -30,6 +50,9 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      # Smoke-sized heap: four java brokers at the image default (1G) saturate
+      # CI runners and caused load-flakes in the MCP consume-pool suite.
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
 
   redpanda-sr-test:
     image: redpandadata/redpanda:latest
@@ -51,3 +74,81 @@ services:
     ports:
       - "19092:9092"
       - "19081:8081"
+
+  kafka-sasl-test:
+    image: apache/kafka:latest
+    container_name: dbx-kafka-sasl-test
+    ports:
+      - "29092:29092"
+    environment:
+      # --- KRaft single-node, separate cluster id/port from kafka-test ---
+      KAFKA_NODE_ID: "2"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "2@localhost:29093"
+      KAFKA_LISTENERS: "SASL://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093"
+      KAFKA_ADVERTISED_LISTENERS: "SASL://127.0.0.1:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,SASL:SASL_PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # Inter-broker auth reuses the SASL listener; the broker logs in as the
+      # "admin" user declared in the JAAS block below (user_admin entry).
+      # PLAIN (not SCRAM): PLAIN serves credentials straight from the JAAS
+      # user_ entries; KRaft-mode SCRAM needs credentials registered into the
+      # metadata log at format time, which this smoke compose avoids on
+      # purpose. SCRAM client logic is unit-covered (franz-go).
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SASL"
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+      KAFKA_SASL_ENABLED_MECHANISMS: "PLAIN"
+      KAFKA_LISTENER_NAME_SASL_SASL_ENABLED_MECHANISMS: "PLAIN"
+      # Static users via JAAS: "admin" (inter-broker) + "smoke" (client).
+      # Property listener.name.sasl.plain.sasl.jaas.config — the image's env
+      # conversion maps `.` -> `_`, `_` -> `__`, `-` -> `___` (triple
+      # underscore), which is how a dashed segment would be spelled.
+      KAFKA_LISTENER_NAME_SASL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="${KAFKA_TEST_SASL_ADMIN_PASSWORD:?export KAFKA_TEST_SASL_ADMIN_PASSWORD}" user_admin="${KAFKA_TEST_SASL_ADMIN_PASSWORD}" user_smoke="${KAFKA_TEST_SASL_PASSWORD:?export KAFKA_TEST_SASL_PASSWORD}";'
+      # --- single-broker internals ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      # Smoke-sized heap: four java brokers at the image default (1G) saturate
+      # CI runners and caused load-flakes in the MCP consume-pool suite.
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
+
+  kafka-tls-test:
+    image: apache/kafka:latest
+    container_name: dbx-kafka-tls-test
+    ports:
+      - "30092:30092"
+    environment:
+      # --- KRaft single-node, third cluster id/port range ---
+      KAFKA_NODE_ID: "3"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "3@localhost:30093"
+      KAFKA_LISTENERS: "SSL://0.0.0.0:30092,CONTROLLER://0.0.0.0:30093"
+      KAFKA_ADVERTISED_LISTENERS: "SSL://127.0.0.1:30092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,SSL:SSL"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      # Server cert SAN covers DNS:localhost + IP:127.0.0.1 (generated by the
+      # orchestrator); inter-broker reuses the SSL listener, so the broker
+      # presents its own cert for mTLS.
+      KAFKA_INTER_BROKER_LISTENER_NAME: "SSL"
+      # mTLS mandatory: clients must present a cert issued by the smoke CA.
+      # This flag also makes the image's configure script wire up the
+      # truststore from the *_CREDENTIALS files below.
+      KAFKA_SSL_CLIENT_AUTH: "required"
+      KAFKA_SSL_KEYSTORE_FILENAME: "broker.p12"
+      KAFKA_SSL_KEYSTORE_TYPE: "PKCS12"
+      KAFKA_SSL_KEY_CREDENTIALS: "keystore.password"
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: "keystore.password"
+      KAFKA_SSL_TRUSTSTORE_FILENAME: "truststore.p12"
+      KAFKA_SSL_TRUSTSTORE_TYPE: "PKCS12"
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: "truststore.password"
+      # --- single-broker internals ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      # Smoke-sized heap: four java brokers at the image default (1G) saturate
+      # CI runners and caused load-flakes in the MCP consume-pool suite.
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
+    volumes:
+      - "${KAFKA_TEST_TLS_SECRETS_DIR:?export KAFKA_TEST_TLS_SECRETS_DIR}:/etc/kafka/secrets:ro"

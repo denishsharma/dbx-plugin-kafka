@@ -18,14 +18,31 @@ jobs:
     if: startsWith(github.event.release.tag_name, 'kafka-v')
     name: Validate Kafka release identity
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.x
+          cache-dependency-path: backend/go.sum
+      # The release event fires as soon as the release is published; if the
+      # tagged commit was never gated by CI (or regressed), a failed build
+      # would leave a broken release behind. Re-run the check suite here so
+      # the 5-platform build only starts on a verified tree.
       - name: Validate manifest and release tag
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           python3 scripts/validate_repo.py
+          node scripts/connection-forms/verify.mjs kafka
           python3 - "$RELEASE_TAG" <<'PY'
           import json
           import pathlib
@@ -35,6 +52,24 @@ jobs:
           if sys.argv[1] != expected:
               raise SystemExit(f"release tag {sys.argv[1]!r} does not match {expected!r}")
           PY
+      - name: Frontend checks
+        run: |
+          pnpm --dir frontend install --frozen-lockfile
+          pnpm --dir frontend typecheck
+          pnpm --dir frontend test
+          if ! git diff --quiet -- ui/; then
+            git diff --stat -- ui/
+            echo "ui/ is stale: run 'pnpm --dir frontend build' and commit the output" >&2
+            exit 1
+          fi
+      - name: Go sidecar checks
+        run: |
+          unformatted="$(cd backend && gofmt -l main.go internal)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed: $unformatted" >&2
+            exit 1
+          fi
+          (cd backend && go vet ./... && go test ./...)
 
   build:
     if: startsWith(github.event.release.tag_name, 'kafka-v')

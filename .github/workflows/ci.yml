@@ -6,6 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Superseded runs on the same ref are pointless spend now that CI includes a
+# container integration matrix; keep the latest only (never cancel a release
+# branch's own in-flight run since releases are cut from tags, not PRs).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -58,6 +65,11 @@ jobs:
             echo "ui/ is stale: run 'pnpm --dir frontend build' and commit the output" >&2
             exit 1
           fi
+      # Headless Chrome walkthrough against the mock host (mounts the app,
+      # zero page errors, MCP ui-intent roundtrip). SKIPs by design when no
+      # Chrome is available; ubuntu-24.04 runners ship google-chrome.
+      - name: UI walkthrough (headless Chrome)
+        run: node scripts/ui_test.mjs
 
   backend:
     name: Go sidecar checks
@@ -72,7 +84,43 @@ jobs:
       # Module downloads need the network; go.sum pins every version. The
       # vendored SDK (shared/sdk/go/dbx-plugin-sdk) is resolved through the
       # backend/go.mod replace, no host checkout required.
+      - name: gofmt clean
+        run: |
+          unformatted="$(cd backend && gofmt -l main.go internal)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
       - run: (cd backend && go vet ./... && go test ./...)
+
+  integration:
+    name: Container integration smoke
+    needs: [validate, frontend, backend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.x
+          cache-dependency-path: backend/go.sum
+      - name: Build sidecar
+        run: (cd backend && CGO_ENABLED=0 go build -trimpath -o bin/dbx-plugin-kafka .)
+      # smoke_container.py brings up docker-compose.kafka-test.yml (apache/kafka
+      # KRaft + redpanda SR + SASL/PLAIN and SSL/mTLS clusters), probes real
+      # readiness (metadata / GET /subjects / auth handshakes), seeds topics,
+      # runs scripts/smoke_test.py (S1-S17) and scripts/smoke_mcp.py (K1-K19)
+      # against the live clusters, and always tears down.
+      # KAFKA_TEST_REQUIRE=1 turns "no broker / no sidecar / init failure"
+      # into FAIL; env-gated scenarios (AWS Glue S12, OAUTHBEARER S15) still
+      # SKIP without their credentials, by design. SASL credentials for S16
+      # are throwaway values exported by the orchestrator.
+      - name: Run Kafka container smoke (S1-S17 + MCP K1-K19),
+        env:
+          KAFKA_TEST_REQUIRE: "1"
+          PYTHONUTF8: "1"
+        run: python3 scripts/smoke_container.py
 
   candidate:
     name: Package candidate (${{ matrix.target }})

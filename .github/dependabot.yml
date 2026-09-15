@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # CI/release workflows pin action versions (checkout@v4, setup-go@v5, ...).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  # Sidecar module + vendored SDK both carry go.mod files.
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /shared/sdk/go/dbx-plugin-sdk
+    schedule:
+      interval: weekly
+  # pnpm lockfile is handled by the npm ecosystem (pnpm supported natively).
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly

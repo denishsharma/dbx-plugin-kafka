@@ -88,6 +88,19 @@ function state(overrides) {
 // Kafka connection matrix: broker discovery x security protocol x SASL
 // mechanism (incl. Kerberos/OAuth sub-forms) x Schema Registry flavor
 // x read-only/delete gate. Full cross product keeps the cascade honest.
+//
+// Cross-field semantic conflicts (which the host's single-field
+// visible_when/required_when evaluator cannot express) are guarded on the
+// backend in validateRequiredCombination (backend/internal/kafkaconn/types.go,
+// matrix regression: required_matrix_test.go) and surface as -32602:
+//   - OAUTHBEARER requires security_protocol=SASL_SSL
+//   - msk_access_key_id + msk_secret_access_key must pair; msk_session_token
+//     is only valid alongside an explicit pair
+//   - tls_client_cert + tls_client_key (secret) must pair for mTLS
+//   - schema_registry=confluent requires sr_url with an http(s) scheme
+// Dormant values of hidden fields are intentionally kept (switching back
+// restores credentials); the backend ignores them unless their branch is
+// active (glue static keys, zk/bootstrap, SASL sub-forms).
 for (const connection_source of options("connection_source")) {
   for (const security_protocol of options("security_protocol")) {
     for (const sasl_mechanism of options("sasl_mechanism")) {
