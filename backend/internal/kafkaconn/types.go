@@ -306,19 +306,26 @@ func (p Profile) Validate() error {
 // *InvalidParamsError（main.go 映射 -32602）。
 //
 // 矩阵：
-//   - schema_registry=confluent → sr_url 必填
+//   - schema_registry=confluent → sr_url 必填且必须带 http(s) scheme
 //   - schema_registry=aws_glue → glue_region/glue_registry_name 必填；
 //     glue_auth_mode=static 时 AK/SK 必填（token 可选）
+//   - mTLS：tls_client_cert / tls_client_key（secret）必须成对出现
 //   - SASL 非 GSSAPI/OAUTHBEARER → sasl username/password 必填
 //   - GSSAPI → kerberos principal/keytab 必填
 //   - OAUTHBEARER（Phase 3）→ security_protocol 必须为 SASL_SSL；
 //     token_source=msk_iam → mskRegion 必填；static_token → oauthStaticToken
-//     必填；msk 显式 AK/SK 须成对（可选覆盖默认链）
+//     必填；msk 显式 AK/SK 须成对（可选覆盖默认链），mskSessionToken 只随
+//     显式 AK/SK 有效（单独提供会被默认链静默丢弃 → 参数错）
 func validateRequiredCombination(p Profile, s connSecrets) error {
 	switch p.SchemaRegistry {
 	case SchemaRegistryConfluent:
 		if strings.TrimSpace(p.SRURL) == "" {
 			return &InvalidParamsError{Msg: "srUrl is required when schemaRegistry is \"confluent\""}
+		}
+		// 无 scheme 的 URL 会在首次 REST 请求时才报 "unsupported protocol
+		// scheme"；提前为参数错，错误信息直接指向表单字段。
+		if scheme := strings.ToLower(p.SRURL); !strings.HasPrefix(scheme, "http://") && !strings.HasPrefix(scheme, "https://") {
+			return &InvalidParamsError{Msg: fmt.Sprintf("srUrl must start with http:// or https:// (got %q)", p.SRURL)}
 		}
 	case SchemaRegistryAWSGlue:
 		if strings.TrimSpace(p.GlueRegion) == "" {
@@ -336,6 +343,12 @@ func validateRequiredCombination(p Profile, s connSecrets) error {
 			}
 		}
 	}
+	// mTLS 半配置（cert 与 secret key 单边出现）会在拨号期才报 PEM 解析错
+	// （"load tls client certificate/key: ..."，不指向表单字段）；提前为
+	// -32602，字段名与连接表单一一对应。证书内容合法性仍在拨号期校验。
+	if (strings.TrimSpace(p.TLSClientCert) == "") != (strings.TrimSpace(s.TLSClientKey) == "") {
+		return &InvalidParamsError{Msg: "tls_client_cert and tls_client_key must be provided together for mutual TLS"}
+	}
 	// Inactive SASL values remain in saved forms so switching back restores
 	// credentials. Only validate OAuth while a SASL transport is selected.
 	if p.hasSASL() && p.SASLMechanism == SASLMechanismOAUTHBEARER {
@@ -350,6 +363,11 @@ func validateRequiredCombination(p Profile, s connSecrets) error {
 			// 显式静态凭据可选覆盖默认链；给了一半 → 参数错。
 			if (strings.TrimSpace(p.MSKAccessKeyID) == "") != (strings.TrimSpace(s.MSKSecretAccessKey) == "") {
 				return &InvalidParamsError{Msg: "mskAccessKeyID and mskSecretAccessKey must be provided together to override the default AWS credential chain"}
+			}
+			// 会话 token 是 STS 临时凭据的一部分，只随显式 AK/SK 生效；
+			// 单独提供时默认链不会消费它（静默丢弃 → 排障困惑）→ 参数错。
+			if strings.TrimSpace(s.MSKSessionToken) != "" && strings.TrimSpace(p.MSKAccessKeyID) == "" {
+				return &InvalidParamsError{Msg: "mskSessionToken requires mskAccessKeyID and mskSecretAccessKey (STS session credentials are never used alone)"}
 			}
 		case OauthTokenSourceStatic:
 			if strings.TrimSpace(s.OauthStaticToken) == "" {

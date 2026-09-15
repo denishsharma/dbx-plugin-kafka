@@ -179,6 +179,54 @@ func TestRequiredCombinationMatrix(t *testing.T) {
 			config:  `{` + baseBootstrap + `, "security_protocol": "SASL_SSL", "sasl_mechanism": "OAUTHBEARER", "oauth_token_source": "static_token"}`,
 			secrets: `{"oauth_static_token": "tok"}`,
 		},
+		// --- 跨字段组合冲突：mTLS 半配置（表单藏不住的残留值在保存期就报
+		// -32602，而不是拨号期的 PEM 解析错） ---
+		{
+			name:        "tls client cert without key",
+			config:      `{` + baseBootstrap + `, "security_protocol": "SSL", "tls_client_cert": "-----BEGIN CERTIFICATE-----"}`,
+			secrets:     `{}`,
+			wantErrSub:  "must be provided together for mutual TLS",
+			wantInvalid: true,
+		},
+		{
+			name:        "tls client key without cert",
+			config:      `{` + baseBootstrap + `, "security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN", "sasl_username": "app"}`,
+			secrets:     `{"sasl_password": "pw", "tls_client_key": "-----BEGIN PRIVATE KEY-----"}`,
+			wantErrSub:  "must be provided together for mutual TLS",
+			wantInvalid: true,
+		},
+		{
+			name:    "tls client cert+key pair passes validation (PEM parse stays at dial)",
+			config:  `{` + baseBootstrap + `, "security_protocol": "SSL", "tls_client_cert": "placeholder-cert"}`,
+			secrets: `{"tls_client_key": "placeholder-key"}`,
+		},
+		// --- 跨字段组合冲突：MSK 孤儿会话 token（默认链不消费 → 静默丢弃） ---
+		{
+			name:        "msk session token without explicit credentials",
+			config:      `{` + baseBootstrap + `, "security_protocol": "SASL_SSL", "sasl_mechanism": "OAUTHBEARER", "msk_region": "us-east-1"}`,
+			secrets:     `{"msk_session_token": "tok"}`,
+			wantErrSub:  "mskSessionToken requires mskAccessKeyID and mskSecretAccessKey",
+			wantInvalid: true,
+		},
+		{
+			name:    "msk session token with explicit credentials ok",
+			config:  `{` + baseBootstrap + `, "security_protocol": "SASL_SSL", "sasl_mechanism": "OAUTHBEARER", "msk_region": "us-east-1", "msk_access_key_id": "ak"}`,
+			secrets: `{"msk_secret_access_key": "sk", "msk_session_token": "tok"}`,
+		},
+		// --- 跨字段组合冲突：sr_url 缺 scheme（首次 REST 请求才报
+		// "unsupported protocol scheme" → 提前为 -32602） ---
+		{
+			name:        "confluent sr_url without scheme",
+			config:      `{` + baseBootstrap + `, "schema_registry": "confluent", "sr_url": "sr:8081"}`,
+			secrets:     `{}`,
+			wantErrSub:  `srUrl must start with http:// or https:// (got "sr:8081")`,
+			wantInvalid: true,
+		},
+		{
+			name:    "confluent sr_url with uppercase scheme ok",
+			config:  `{` + baseBootstrap + `, "schema_registry": "confluent", "sr_url": "HTTPS://sr:8081"}`,
+			secrets: `{}`,
+		},
 	}
 	for _, tc := range cases {
 		service := NewService()
