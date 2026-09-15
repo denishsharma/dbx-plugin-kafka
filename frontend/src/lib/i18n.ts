@@ -617,6 +617,10 @@ export const messages = {
       flowAutoStoppedRecords: "Generator stopped: message limit reached",
       flowAutoStoppedDuration: "Generator stopped: time limit reached",
     },
+    connProps: {
+      summary: "{mapped} mapped · {ignored} ignored",
+      ignoredKeys: "Ignored keys: {keys}",
+    },
   },
   "zh-CN": {
     hostApiUnavailable: "DBX Host API 不可用",
@@ -1231,6 +1235,10 @@ export const messages = {
       flowMaxDurationMs: "发送满时长后停止（0 = 不限）",
       flowAutoStoppedRecords: "生成已停止：达到条数上限",
       flowAutoStoppedDuration: "生成已停止：达到时长上限",
+    },
+    connProps: {
+      summary: "已映射 {mapped} 项 · 已忽略 {ignored} 项",
+      ignoredKeys: "忽略的键：{keys}",
     },
   },
   "zh-TW": {
@@ -1847,6 +1855,10 @@ export const messages = {
       flowAutoStoppedRecords: "產生已停止：達到訊息數上限",
       flowAutoStoppedDuration: "產生已停止：達到時間上限",
     },
+    connProps: {
+      summary: "已映射 {mapped} 項 · 已忽略 {ignored} 項",
+      ignoredKeys: "忽略的鍵：{keys}",
+    },
   },
   es: {
     hostApiUnavailable: "La API Host de DBX no está disponible",
@@ -2461,6 +2473,10 @@ export const messages = {
       flowMaxDurationMs: "Detener tras ms (0 = sin límite)",
       flowAutoStoppedRecords: "Generador detenido: límite de mensajes alcanzado",
       flowAutoStoppedDuration: "Generador detenido: límite de tiempo alcanzado",
+    },
+    connProps: {
+      summary: "{mapped} mapeadas · {ignored} ignoradas",
+      ignoredKeys: "Claves ignoradas: {keys}",
     },
   },
   it: {
@@ -3077,6 +3093,10 @@ export const messages = {
       flowAutoStoppedRecords: "Generatore fermato: limite di messaggi raggiunto",
       flowAutoStoppedDuration: "Generatore fermato: limite di tempo raggiunto",
     },
+    connProps: {
+      summary: "{mapped} mappate · {ignored} ignorate",
+      ignoredKeys: "Chiavi ignorate: {keys}",
+    },
   },
   ja: {
     hostApiUnavailable: "DBX Host API を利用できません",
@@ -3692,6 +3712,10 @@ export const messages = {
       flowAutoStoppedRecords: "生成を停止しました: 件数上限に到達",
       flowAutoStoppedDuration: "生成を停止しました: 時間上限に到達",
     },
+    connProps: {
+      summary: "マッピング {mapped} 件 · 無視 {ignored} 件",
+      ignoredKeys: "無視されたキー: {keys}",
+    },
   },
   "pt-BR": {
     hostApiUnavailable: "API Host do DBX indisponível",
@@ -4306,6 +4330,10 @@ export const messages = {
       flowMaxDurationMs: "Parar após ms (0 = sem limite)",
       flowAutoStoppedRecords: "Gerador parado: limite de mensagens atingido",
       flowAutoStoppedDuration: "Gerador parado: limite de tempo atingido",
+    },
+    connProps: {
+      summary: "{mapped} mapeadas · {ignored} ignoradas",
+      ignoredKeys: "Chaves ignoradas: {keys}",
     },
   },
 };
