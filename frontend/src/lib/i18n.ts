@@ -603,6 +603,11 @@ export const messages = {
       favoriteAdd: "Favorite topic",
       favoriteRemove: "Unfavorite topic",
     },
+    schemaWrite: {
+      normalize: "Normalize",
+      normalizeHint: "Ask the registry to normalize the stored schema text (Confluent only)",
+      editorPlaceholder: "Paste or edit the schema definition",
+    },
   },
   "zh-CN": {
     hostApiUnavailable: "DBX Host API 不可用",
@@ -1203,6 +1208,11 @@ export const messages = {
       internalToggle: "显示内部 topic",
       favoriteAdd: "收藏 topic",
       favoriteRemove: "取消收藏",
+    },
+    schemaWrite: {
+      normalize: "归一化",
+      normalizeHint: "要求注册表归一化存储的 schema 文本（仅 Confluent）",
+      editorPlaceholder: "粘贴或编辑 schema 定义",
     },
   },
   "zh-TW": {
@@ -1805,6 +1815,11 @@ export const messages = {
       favoriteAdd: "收藏 topic",
       favoriteRemove: "取消收藏",
     },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "要求登錄檔正規化儲存的 schema 文字（僅 Confluent）",
+      editorPlaceholder: "貼上或編輯 schema 定義",
+    },
   },
   es: {
     hostApiUnavailable: "La API Host de DBX no está disponible",
@@ -2405,6 +2420,11 @@ export const messages = {
       internalToggle: "Mostrar topics internos",
       favoriteAdd: "Marcar topic como favorito",
       favoriteRemove: "Quitar de favoritos",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pide al registro normalizar el texto del esquema almacenado (solo Confluent)",
+      editorPlaceholder: "Pega o edita la definición del esquema",
     },
   },
   it: {
@@ -3007,6 +3027,11 @@ export const messages = {
       favoriteAdd: "Aggiungi topic ai preferiti",
       favoriteRemove: "Rimuovi dai preferiti",
     },
+    schemaWrite: {
+      normalize: "Normalizza",
+      normalizeHint: "Chiede al registro di normalizzare il testo dello schema memorizzato (solo Confluent)",
+      editorPlaceholder: "Incolla o modifica la definizione dello schema",
+    },
   },
   ja: {
     hostApiUnavailable: "DBX Host API を利用できません",
@@ -3608,6 +3633,11 @@ export const messages = {
       favoriteAdd: "topic をお気に入りに追加",
       favoriteRemove: "お気に入りから削除",
     },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "レジストリに保存時のスキーマテキストの正規化を依頼します（Confluent のみ）",
+      editorPlaceholder: "スキーマ定義を貼り付けまたは編集",
+    },
   },
   "pt-BR": {
     hostApiUnavailable: "API Host do DBX indisponível",
@@ -4208,6 +4238,11 @@ export const messages = {
       internalToggle: "Mostrar tópicos internos",
       favoriteAdd: "Favoritar tópico",
       favoriteRemove: "Desfavoritar tópico",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pede ao Registry para normalizar o texto do esquema armazenado (somente Confluent)",
+      editorPlaceholder: "Cole ou edite a definição do esquema",
     },
   },
 };
