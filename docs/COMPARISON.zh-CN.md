@@ -7,7 +7,7 @@
 
 ## 能力矩阵
 
-| 能力 | DBX Kafka | kcat / kafkacat | kafka-console-consumer / producer | kafka-ui（Provectus） | AKHQ | Conduktor | Offset Explorer |
+| 能力 | Kafka Studio | kcat / kafkacat | kafka-console-consumer / producer | kafka-ui（Provectus） | AKHQ | Conduktor | Offset Explorer |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 图形化连接管理 | 内置 | — | — | 内置 | 内置 | 内置 | 内置 |
 | Topic/分区/配置巡检 | 内置 | 命令行元数据 | — | 内置 | 内置 | 内置 | 内置 |
@@ -29,16 +29,16 @@
 
 - **kcat / kafka-console-consumer / kafka-console-producer**：脚本化、轻量、适合
   CI 和管道串联；没有持久连接上下文、过滤要自己写管道、误操作没有确认门。
-  DBX Kafka 不替代它们做胶水脚本，而是把日常检查和受控操作放进可视界面与
+  Kafka Studio 不替代它们做胶水脚本，而是把日常检查和受控操作放进可视界面与
   权限边界内。
 - **Kafka Web UI（kafka-ui、AKHQ 等）**：独立部署的 Web 服务，适合团队共享
-  只读观测；需要额外部署、端口和账号体系。DBX Kafka 是宿主内插件，连接、
+  只读观测；需要额外部署、端口和账号体系。Kafka Studio 是宿主内插件，连接、
   凭据（secret binding）和界面跟随 DBX 工作台，无需单独运维一套服务。
 - **Conduktor / Offset Explorer 等商业桌面工具**：功能面广、部分能力随商业
-  计划分层。DBX Kafka 的差异化在“宿主一体 + MCP 自动化 + 诚实的安全门”：
+  计划分层。Kafka Studio 的差异化在“宿主一体 + MCP 自动化 + 诚实的安全门”：
   AI 客户端经 MCP 复用已保存连接，写路径强制两阶段确认并落审计。
 - **DBX 插件家族中的位置**：SSH 终端管主机与文件，Files 管文件系统与对象存储，
-  LDAP 管目录，DBX Kafka 管 Kafka 集群——各插件通过 DBX 宿主复用连接、
+  LDAP 管目录，Kafka Studio 管 Kafka 集群——各插件通过 DBX 宿主复用连接、
   凭据与工作台桥接，不重复实现彼此的协议。
 
 ## 如何选择
@@ -47,4 +47,4 @@
 - 团队需要一个独立部署的共享 Web 控制台：kafka-ui、AKHQ 值得评估。
 - 需要大规模数据管道的商业治理/监控：关注 Conduktor 的对应版本能力。
 - 已在使用 DBX，或希望让 AI 在明确的权限边界内查询与受控操作 Kafka：
-  DBX Kafka 把连接、凭据、界面和 MCP 自动化放进同一套宿主体系。
+  Kafka Studio 把连接、凭据、界面和 MCP 自动化放进同一套宿主体系。

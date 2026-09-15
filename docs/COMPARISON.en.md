@@ -10,7 +10,7 @@ deciding.
 
 ## Capability matrix
 
-| Capability | DBX Kafka | kcat / kafkacat | kafka-console-consumer / producer | kafka-ui (Provectus) | AKHQ | Conduktor | Offset Explorer |
+| Capability | Kafka Studio | kcat / kafkacat | kafka-console-consumer / producer | kafka-ui (Provectus) | AKHQ | Conduktor | Offset Explorer |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Graphical connection management | Built-in | — | — | Built-in | Built-in | Built-in | Built-in |
 | Topic/partition/config inspection | Built-in | CLI metadata | — | Built-in | Built-in | Built-in | Built-in |
@@ -32,19 +32,19 @@ deciding.
 
 - **kcat / kafka-console-consumer / kafka-console-producer**: lightweight, scriptable,
   great for CI and piping. They lack a persistent connection context, filters require
-  hand-built pipes, and mistakes have no confirmation gate. DBX Kafka does not replace
+  hand-built pipes, and mistakes have no confirmation gate. Kafka Studio does not replace
   them for glue scripts; it moves everyday inspection and guarded operations into a
   visual workspace with permission boundaries.
 - **Kafka web UIs (kafka-ui, AKHQ, etc.)**: independently deployed web services suited
   to shared, read-mostly observation; they require their own deployment, ports, and
-  account system. DBX Kafka is a host plugin — connections, credentials (secret
+  account system. Kafka Studio is a host plugin — connections, credentials (secret
   bindings), and UI follow the DBX workspace with no extra service to run.
 - **Commercial desktop tools (Conduktor, Offset Explorer, etc.)**: broad feature sets,
-  some gated by commercial plans. DBX Kafka differentiates on “host integration +
+  some gated by commercial plans. Kafka Studio differentiates on “host integration +
   MCP automation + honest safety gates”: AI clients reuse saved connections over MCP,
   and the write path enforces two-phase confirmation with audit logging.
 - **Within the DBX plugin family**: the SSH terminal covers hosts and files, Files
-  covers filesystems and object storage, LDAP covers directories, and DBX Kafka covers
+  covers filesystems and object storage, LDAP covers directories, and Kafka Studio covers
   Kafka clusters — each reuses DBX host connections, credentials, and the workbench
   bridge instead of reimplementing the others' protocols.
 
@@ -55,5 +55,5 @@ deciding.
 - Commercial governance/monitoring for large data platforms: look at the relevant
   Conduktor edition.
 - Already using DBX, or want AI to query and operate Kafka within explicit permission
-  boundaries: DBX Kafka keeps connections, credentials, UI, and MCP automation in one
+  boundaries: Kafka Studio keeps connections, credentials, UI, and MCP automation in one
   host-integrated package.

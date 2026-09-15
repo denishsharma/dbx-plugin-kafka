@@ -1,4 +1,4 @@
-# DBX Kafka 产品宣传素材
+# Kafka Studio 产品宣传素材
 
 本页集中提供可直接用于 GitHub、发布说明和产品介绍的纯文字素材。所有描述以
 当前实现为准；仓库暂未收录截图或演示视频，请勿引用不存在的媒体文件，
@@ -6,13 +6,13 @@
 
 ## 一句话定位
 
-`DBX Kafka：把 topic 巡检、消息检索、消费组观测、Schema 查看和受控写操作集中到一个 DBX 工作台。`
+`Kafka Studio：把 topic 巡检、消息检索、消费组观测、Schema 查看和受控写操作集中到一个 DBX 工作台。`
 
 ## 宣传文案
 
-短版：`DBX Kafka——在 DBX 工作台中管理 Apache Kafka：topic、消息、消费组、ACL 和 Schema Registry 一个界面管完。`
+短版：`Kafka Studio——在 DBX 工作台中管理 Apache Kafka：topic、消息、消费组、ACL 和 Schema Registry 一个界面管完。`
 
-长版：`DBX Kafka 是面向 Apache Kafka 运维与排障的可视化工作台。浏览 topic、分区、ISR
+长版：`Kafka Studio 是面向 Apache Kafka 运维与排障的可视化工作台。浏览 topic、分区、ISR
 与集群元数据；生产与消费消息，支持多通道过滤、字段检索、offset 策略、Base64 与常见
 压缩/解码；流式消费支持暂停、恢复、缓冲与 JSON/CSV 导出；消费组 lag、成员与 offset
 一目了然，重置操作受控可审计；支持 PLAINTEXT、TLS、SASL（PLAIN/SCRAM）、

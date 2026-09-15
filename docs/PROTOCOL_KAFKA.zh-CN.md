@@ -1,4 +1,4 @@
-# DBX Kafka 插件协议文档（PROTOCOL_KAFKA）
+# Kafka Studio 插件协议文档（PROTOCOL_KAFKA）
 
 > 版本基准：kafka v0.2.0（Phase 1 + Phase 2 商用化）。素材来源与唯一权威：
 > `docs/IMPL_PLAN_DBX_KAFKA.zh-CN.md` §0.2/§5（实现必须与本文件同步；

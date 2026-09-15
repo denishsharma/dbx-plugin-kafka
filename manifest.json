@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/dev/plugin-framework-current/plugins/manifest.schema.json",
   "manifest_version": 1,
   "id": "io.dbx.kafka",
-  "name": "DBX Kafka",
+  "name": "Kafka Studio",
   "version": "0.1.38",
   "publisher": "dbx",
   "description": "Operate Apache Kafka from one workspace: inspect topics and partitions, produce and consume messages, filter and decode payloads, monitor consumer lag, manage offsets and ACLs, stream records, and export results.",
@@ -690,7 +690,7 @@
   ],
   "localizations": {
     "zh-CN": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "在一个工作台中管理 Apache Kafka：查看 topic 与分区、生产和消费消息、过滤与解码 payload、监控消费组 lag、管理 offset 和 ACL、流式消费并导出结果。",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -880,7 +880,7 @@
       }
     },
     "zh-TW": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "DBX 的 Kafka 主控台外掛：topic 與分割區、訊息生產與消費（過濾/解碼）、消費組（lag 與 offset 重置）、ACL、串流消費與匯出。",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -1070,7 +1070,7 @@
       }
     },
     "en": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "Operate Apache Kafka from one workspace: inspect topics and partitions, produce and consume messages, filter and decode payloads, monitor consumer lag, manage offsets and ACLs, stream records, and export results.",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -1260,7 +1260,7 @@
       }
     },
     "es": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "Plugin de consola Kafka para DBX: topics y particiones, producción/consumo de mensajes con filtros y decodificación, grupos de consumidores con lag y reset de offsets, ACL, consumo en streaming y exportación.",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -1450,7 +1450,7 @@
       }
     },
     "it": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "Plugin console Kafka per DBX: topic e partizioni, produzione/consumo di messaggi con filtri e decodifica, gruppi di consumatori con lag e reset degli offset, ACL, consumo in streaming ed esportazione.",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -1640,7 +1640,7 @@
       }
     },
     "ja": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "DBX 用 Kafka コンソールプラグイン: トピックとパーティション、フィルタリング/デコード付きメッセージ送受信、コンシューマーグループ（ラグと offset リセット）、ACL、ストリーミング消費とエクスポート。",
       "contributions": {
         "io.dbx.kafka.connection": {
@@ -1830,7 +1830,7 @@
       }
     },
     "pt-BR": {
-      "name": "DBX Kafka",
+      "name": "Kafka Studio",
       "description": "Plugin de console Kafka para o DBX: tópicos e partições, produção/consumo de mensagens com filtros e decodificação, grupos de consumidores com lag e redefinição de offsets, ACLs, consumo em streaming e exportação.",
       "contributions": {
         "io.dbx.kafka.connection": {

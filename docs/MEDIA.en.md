@@ -1,4 +1,4 @@
-# DBX Kafka showcase assets
+# Kafka Studio showcase assets
 
 This page collects copy-ready, text-only assets for GitHub, release notes, and
 product introductions. All statements reflect the current implementation. The
@@ -7,13 +7,13 @@ files that do not exist, and expect this page to grow when assets land.
 
 ## One-line positioning
 
-`DBX Kafka: topic inspection, message search, consumer-group monitoring, schema checks, and guarded write operations in one DBX workspace.`
+`Kafka Studio: topic inspection, message search, consumer-group monitoring, schema checks, and guarded write operations in one DBX workspace.`
 
 ## Copy-ready messaging
 
-Short: `DBX Kafka — manage Apache Kafka from the DBX workspace: topics, messages, consumer groups, ACLs, and Schema Registry in one interface.`
+Short: `Kafka Studio — manage Apache Kafka from the DBX workspace: topics, messages, consumer groups, ACLs, and Schema Registry in one interface.`
 
-Long: `DBX Kafka is a visual workspace for Apache Kafka operations and troubleshooting.
+Long: `Kafka Studio is a visual workspace for Apache Kafka operations and troubleshooting.
 Browse topics, partitions, ISR, and cluster metadata; produce and consume messages with
 multi-channel filters, field search, offset strategies, Base64 handling, and common
 compression/decoding; stream records with pause, resume, buffering, and JSON/CSV export;

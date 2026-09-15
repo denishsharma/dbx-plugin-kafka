@@ -1,11 +1,11 @@
-# DBX Kafka
+# Kafka Studio
 
 [![CI](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/jinpy666/dbx-plugin-kafka?display_name=tag)](https://github.com/jinpy666/dbx-plugin-kafka/releases)
 
 [中文](README.md) · [Showcase](docs/MEDIA.en.md) · [Feature comparison](docs/COMPARISON.en.md) · [MCP guide](docs/MCP_USAGE.en.md) · [Repository split notes](docs/REPOSITORY_SPLIT.en.md)
 
-DBX Kafka is a visual workspace for Apache Kafka operations and troubleshooting.
+Kafka Studio is a visual workspace for Apache Kafka operations and troubleshooting.
 Open one connection and move from topic inspection to message search, consumer-group
 observation, schema checks, and guarded write operations, then hand the same
 capabilities to AI automation through MCP tools. It turns the next hour after
@@ -13,9 +13,11 @@ capabilities to AI automation through MCP tools. It turns the next hour after
 
 > Topics · Messages · Consumer Groups · Schema Registry: one DBX workspace for everyday Kafka operations.
 
+![Kafka Studio walkthrough](docs/media/kafka-studio-demo.mp4)
+
 ## Why teams reach for it
 
-| Your job | The DBX Kafka workflow |
+| Your job | The Kafka Studio workflow |
 | --- | --- |
 | Inspect clusters and topics quickly | Topics, partitions, ISR, configs, consumer groups, and cluster metadata in one view |
 | Investigate messages and lag | Multi-channel filters, offset strategies, message detail drawer, and consumer-group lag views |

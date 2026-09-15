@@ -1,20 +1,22 @@
-# DBX Kafka
+# Kafka Studio
 
 [![CI](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml/badge.svg)](https://github.com/jinpy666/dbx-plugin-kafka/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/jinpy666/dbx-plugin-kafka?display_name=tag)](https://github.com/jinpy666/dbx-plugin-kafka/releases)
 
 [English](README.en.md) · [产品宣传页](docs/MEDIA.zh-CN.md) · [特性与竞品对比](docs/COMPARISON.zh-CN.md) · [MCP 使用指南](docs/MCP_USAGE.zh-CN.md) · [独立仓库迁移说明](docs/REPOSITORY_SPLIT.zh-CN.md)
 
-DBX Kafka 是面向 Apache Kafka 运维与排障的可视化工作台。打开一个连接，就能完成
+Kafka Studio 是面向 Apache Kafka 运维与排障的可视化工作台。打开一个连接，就能完成
 topic 巡检、消息检索、消费组观测、Schema 查看和受控的写操作，并通过 MCP 工具把
 这些能力交给 AI 自动化。它把“登录集群之后的下一小时”压缩成一个连贯、可审计、
 可复用的工作流。
 
 > Topics · Messages · Consumer Groups · Schema Registry：一个 DBX 工作台管完 Kafka 日常运维。
 
+![Kafka Studio 功能演示](docs/media/kafka-studio-demo.mp4)
+
 ## 为什么值得用
 
-| 你要完成的事 | DBX Kafka 给你的体验 |
+| 你要完成的事 | Kafka Studio 给你的体验 |
 | --- | --- |
 | 快速巡检集群与 topic | topic、分区、ISR、配置、消费组与集群元数据一屏可见 |
 | 排查消息与消费延迟 | 多通道过滤、offset 策略、消息详情抽屉与消费组 lag 视图 |
