@@ -204,16 +204,29 @@ def generate_tls_secrets(secrets_dir: Path) -> None:
     openssl("pkcs12", "-export", "-inkey", str(server_key), "-in", str(server_cert),
             "-certfile", str(ca_cert), "-name", "broker",
             "-passout", f"pass:{TLS_STORE_PASSWORD}", "-out", str(secrets_dir / "broker.p12"))
+    (secrets_dir / "keystore.password").write_text(TLS_STORE_PASSWORD)
+    (secrets_dir / "truststore.password").write_text(TLS_STORE_PASSWORD)
+    # mkdtemp dirs are 0700 owned by the runner user, but every container
+    # involved (keytool one-shot and the broker, uid 1000) reads the mount
+    # through a read-only bind: world-traversable dir + world-readable files
+    # are required there (macOS Docker Desktop hides this behind its uid
+    # mapping, CI Linux runners do not).
+    secrets_dir.chmod(0o755)
+    for path in secrets_dir.iterdir():
+        path.chmod(0o644)
     trust = subprocess.run(
         ["docker", "run", "--rm", "-v", f"{secrets_dir}:/work:ro", "--entrypoint", "sh",
          "apache/kafka:latest", "-c",
          "keytool -importcert -alias ca -file /work/ca.pem -keystore /tmp/truststore.p12 "
          f"-storetype PKCS12 -storepass '{TLS_STORE_PASSWORD}' -noprompt >/dev/null && base64 /tmp/truststore.p12"],
-        check=True, capture_output=True,
+        capture_output=True,
     )
+    if trust.returncode != 0:
+        raise SystemExit(
+            "keytool truststore build failed: "
+            + trust.stderr.decode(errors="replace").strip()
+        )
     (secrets_dir / "truststore.p12").write_bytes(base64.b64decode(trust.stdout))
-    (secrets_dir / "keystore.password").write_text(TLS_STORE_PASSWORD)
-    (secrets_dir / "truststore.password").write_text(TLS_STORE_PASSWORD)
 
 
 def tls_answered() -> bool:
