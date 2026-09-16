@@ -38,7 +38,7 @@ if [ -f manifest.json ]; then
   unset DBX_PLUGIN_SDK_ROOT
   # Same native-CLI direct call as build.sh: the npm wrapper injects
   # DBX_PLUGIN_SDK_ROOT whose bundled go.work is pinned to go 1.22 and breaks
-  # modules requiring >=1.24. Platform suffix resolved per-machine.
+  # modules requiring >=1.25. Platform suffix resolved per-machine.
   . scripts/cli-platform.sh
   if NATIVE_CLI="$(resolve_native_plugin_cli)"; then
     env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 "$NATIVE_CLI" package .

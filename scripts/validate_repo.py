@@ -46,8 +46,8 @@ def main() -> int:
     if not re.search(r'(?m)^module\s+io\.dbx\.kafka\.plugin\s*$', go_mod):
         fail("backend go.mod module does not match io.dbx.kafka.plugin")
     go_version = re.search(r'(?m)^go\s+(\d+)\.(\d+)(?:\.\d+)?\s*$', go_mod)
-    if not go_version or (int(go_version.group(1)), int(go_version.group(2))) < (1, 24):
-        fail("backend go.mod must declare go >= 1.24")
+    if not go_version or (int(go_version.group(1)), int(go_version.group(2))) < (1, 25):
+        fail("backend go.mod must declare go >= 1.25")
     replace = re.search(r"(?m)^replace\s+github\.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk\s+=>\s+(\S+)\s*$", go_mod)
     if not replace or not replace.group(1).startswith("../shared/sdk/go/dbx-plugin-sdk"):
         fail("backend go.mod SDK replace must point at the vendored shared/sdk/go copy")

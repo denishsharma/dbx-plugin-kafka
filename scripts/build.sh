@@ -57,7 +57,7 @@ if [ -f backend/go.mod ] && command -v go >/dev/null 2>&1; then
 fi
 
 # The npm CLI wrapper injects DBX_PLUGIN_SDK_ROOT (bundled SDK ships a go.work
-# pinned to go 1.22, which breaks modules requiring >=1.24). Call the native
+# pinned to go 1.22, which breaks modules requiring >=1.25). Call the native
 # binary directly without SDK_ROOT so the local Go toolchain is used. The
 # platform package suffix is resolved per-machine (linux uses a -gnu suffix),
 # so cross-platform CI never falls back to the wrapper.
