@@ -65,12 +65,28 @@ type Connection struct {
 	Secrets map[string]any `json:"connection_secrets,omitempty"`
 }
 
-// Runtime 是 DBX 传输层拨号端点。Kafka 场景拨号地址是连接参数里的
-// bootstrap（宿主改写后的地址，无需自建隧道）；bootstrap 缺失时以
-// runtime.host:port 兜底（单 seed）。
+// Runtime 是 DBX 传输层拨号端点。Host 1.0 只保证 host/port：它们是
+// transport layers 建立后的最终本地端点，插件不得自行重建隧道。较新的
+// Host 可额外提供 proxy route，用于需要对 Kafka advertised.listeners 的
+// 每个 broker 都执行 SOCKS5 拨号的多 broker 连接；proxy 是可选扩展，旧
+// Host/无代理请求仍只包含 host/port。
 type Runtime struct {
-	Host string `json:"host,omitempty"`
-	Port int    `json:"port,omitempty"`
+	Host  string        `json:"host,omitempty"`
+	Port  int           `json:"port,omitempty"`
+	Proxy *RuntimeProxy `json:"proxy,omitempty"`
+}
+
+// RuntimeProxy describes a host-managed proxy route. Credentials may be
+// hydrated by the host for this lifecycle request and must never be logged or
+// returned by the plugin. Type is intentionally a string for forward
+// compatibility; Kafka currently accepts socks5/socks5h only.
+type RuntimeProxy struct {
+	Type     string `json:"type,omitempty"`
+	Kind     string `json:"kind,omitempty"`
+	Host     string `json:"host,omitempty"`
+	Port     int    `json:"port,omitempty"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 }
 
 // Parse 解析 lifecycle params。宿主不同版本可能省略 provider/runtime，

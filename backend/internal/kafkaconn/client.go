@@ -5,9 +5,10 @@ package kafkaconn
 // client，指纹=bootstrap+auth+TLS 摘要，失效重建；consume/stream 因携带
 // per-request 的消费 opts，每次新建 client 用完即关）。
 //
-// 拨号语义（D5 方案 kafka 侧）：连接参数里的 bootstrap 就是宿主改写后的
-// 地址，直接拨 bootstrap_servers，无需自建隧道；bootstrap 缺失时以
-// runtime.host:port 兜底（单 seed）。
+// 拨号语义（D5 方案 kafka 侧）：无 structured proxy route 时优先拨宿主
+// lifecycle 传入的 runtime.host:port；没有 runtime 端点才回退到 bootstrap。
+// 多 broker 场景若 Host 传入 runtime.proxy，则保留逻辑 bootstrap/metadata
+// 地址，并由统一 SOCKS5 dialer 负责每个 broker 的连接。
 //
 // TLS（CA/client cert/insecure skip verify）+ SASL（PLAIN/SCRAM-SHA-256/
 // SCRAM-SHA-512/GSSAPI/OAUTHBEARER）取值面与 tinyrdm kafkaSASLOpt / kafkaDialer
@@ -15,11 +16,13 @@ package kafkaconn
 // Phase 3 接入，见 oauth.go）。
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +30,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
+	xproxy "golang.org/x/net/proxy"
 
 	"io.dbx.kafka.plugin/internal/lifecycle"
 )
@@ -46,8 +50,9 @@ type connSecrets struct {
 
 // connTarget 是一次拨号需要的运行时端点（bootstrap 空时兜底）。
 type connTarget struct {
-	Host string
-	Port int
+	Host  string
+	Port  int
+	Proxy *lifecycle.RuntimeProxy
 }
 
 // connEntry 是单个宿主连接的 sidecar 内状态。
@@ -71,6 +76,8 @@ type connEntry struct {
 func (e *connEntry) computeFingerprint() string {
 	parts := []string{
 		strings.Join(e.profile.BootstrapServers, ","),
+		e.target.Host,
+		fmt.Sprintf("%d", e.target.Port),
 		e.profile.SecurityProtocol,
 		e.profile.SASLMechanism,
 		e.profile.Username,
@@ -105,23 +112,42 @@ func (e *connEntry) computeFingerprint() string {
 		e.secrets.MSKSessionToken,
 		e.secrets.OauthStaticToken,
 	}
+	if e.target.Proxy != nil {
+		parts = append(parts,
+			e.target.Proxy.Type,
+			e.target.Proxy.Kind,
+			e.target.Proxy.Host,
+			fmt.Sprintf("%d", e.target.Proxy.Port),
+			e.target.Proxy.Username,
+			e.target.Proxy.Password,
+		)
+	}
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(sum[:])
 }
 
-// seedBrokers 返回拨号地址列表：bootstrap 原样（宿主改写后的地址），
-// 空时 runtime.host:port 兜底。
+// seedBrokers 返回逻辑 broker 地址。
+//
+// A structured proxy route must keep the original bootstrap list: franz-go
+// uses broker metadata to discover every advertised broker, and the dialer
+// below sends each of those addresses through the same SOCKS5 route. Without
+// a proxy route, runtime.host:port is the final Host-managed endpoint and is
+// preferred over the raw bootstrap list. This is important for SSH, SOCKS5,
+// HTTP CONNECT, and HTTP tunnel layers represented by a local forward port.
 func (e *connEntry) seedBrokers() []string {
 	// Selecting ZooKeeper must not keep using a previous bootstrap list (or
 	// runtime endpoint) retained in the form's inactive branch.
 	if e.profile.ConnectionSource == ConnectionSourceZookeeper {
 		return nil
 	}
-	if len(e.profile.BootstrapServers) > 0 {
+	if e.target.Proxy != nil && len(e.profile.BootstrapServers) > 0 {
 		return e.profile.BootstrapServers
 	}
 	if e.target.Host != "" && e.target.Port > 0 {
 		return []string{fmt.Sprintf("%s:%d", e.target.Host, e.target.Port)}
+	}
+	if len(e.profile.BootstrapServers) > 0 {
+		return e.profile.BootstrapServers
 	}
 	return nil
 }
@@ -157,12 +183,24 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 		kgo.RequestTimeoutOverhead(5 * time.Second),
 	}
 
+	var tlsConfig *tls.Config
 	if e.profile.hasTLS() {
 		tlsConfig, err := buildTLSConfig(e.profile, e.secrets)
 		if err != nil {
 			return nil, err
 		}
-		opts = append(opts, kgo.DialTLSConfig(tlsConfig))
+		// When Host hands us a local forward endpoint, preserve the logical
+		// broker name for certificate verification instead of using 127.0.0.1.
+		// A structured proxy route leaves ServerName empty here so the custom
+		// dialer can derive SNI from each advertised broker address.
+		if e.target.Proxy == nil && e.target.Host != "" && e.target.Port > 0 {
+			if host := e.logicalTLSSeedHost(seeds); host != "" {
+				tlsConfig.ServerName = host
+			}
+		}
+		if e.target.Proxy == nil {
+			opts = append(opts, kgo.DialTLSConfig(tlsConfig))
+		}
 	}
 
 	if e.profile.hasSASL() {
@@ -173,8 +211,115 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 		opts = append(opts, saslOpt)
 	}
 
+	if e.target.Proxy != nil {
+		dial, err := e.runtimeProxyDialer(tlsConfig)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, kgo.Dialer(dial))
+	}
+
 	opts = append(opts, extraOpts...)
 	return opts, nil
+}
+
+// runtimeProxyDialer creates the one dialer shared by every franz-go client
+// shape. Keeping it at the kgo option boundary means admin, produce, consume,
+// and stream clients cannot accidentally diverge in their transport behavior.
+func (e *connEntry) runtimeProxyDialer(tlsConfig *tls.Config) (func(context.Context, string, string) (net.Conn, error), error) {
+	proxyConfig := e.target.Proxy
+	if proxyConfig == nil {
+		return nil, errf("runtime proxy is not configured")
+	}
+	typeName := strings.ToLower(strings.TrimSpace(proxyConfig.Type))
+	if typeName == "" {
+		typeName = strings.ToLower(strings.TrimSpace(proxyConfig.Kind))
+	}
+	if typeName != "socks5" && typeName != "socks5h" {
+		return nil, errf("unsupported runtime proxy type %q (only socks5 is supported)", typeName)
+	}
+	if strings.TrimSpace(proxyConfig.Host) == "" || proxyConfig.Port <= 0 || proxyConfig.Port > 65535 {
+		return nil, errf("runtime SOCKS5 proxy host and port are required")
+	}
+	auth := (*xproxy.Auth)(nil)
+	if proxyConfig.Username != "" || proxyConfig.Password != "" {
+		auth = &xproxy.Auth{User: proxyConfig.Username, Password: proxyConfig.Password}
+	}
+	dialer, err := xproxy.SOCKS5("tcp", net.JoinHostPort(proxyConfig.Host, fmt.Sprintf("%d", proxyConfig.Port)), auth, &net.Dialer{Timeout: 10 * time.Second})
+	if err != nil {
+		return nil, errf("create runtime SOCKS5 dialer: %v", err)
+	}
+	rawDial := contextDialer(dialer)
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		conn, err := rawDial(ctx, network, address)
+		if err != nil || tlsConfig == nil {
+			return conn, err
+		}
+		config := tlsConfig.Clone()
+		if config.ServerName == "" {
+			config.ServerName = kafkaSeedHost([]string{address})
+		}
+		tlsConn := tls.Client(conn, config)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return tlsConn, nil
+	}, nil
+}
+
+func (e *connEntry) logicalTLSSeedHost(seeds []string) string {
+	if e.target.Proxy == nil && len(e.profile.BootstrapServers) > 0 {
+		return kafkaSeedHost(e.profile.BootstrapServers)
+	}
+	return kafkaSeedHost(seeds)
+}
+
+// contextDialer adapts x/net/proxy's legacy Dialer to kgo's cancellable
+// DialContext contract. The result channel is buffered so a canceled request
+// cannot strand a successful connection; the late result is closed instead.
+func contextDialer(dialer xproxy.Dialer) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		type result struct {
+			conn net.Conn
+			err  error
+		}
+		results := make(chan result, 1)
+		go func() {
+			conn, err := dialer.Dial(network, address)
+			select {
+			case results <- result{conn: conn, err: err}:
+			case <-ctx.Done():
+				if conn != nil {
+					_ = conn.Close()
+				}
+			}
+		}()
+		select {
+		case result := <-results:
+			return result.conn, result.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+// kafkaSeedHost extracts a logical hostname from the first seed for TLS SNI.
+// Kafka seed syntax is host:port; the small scheme trim also tolerates common
+// Kafka properties imports such as SSL://broker:9093.
+func kafkaSeedHost(seeds []string) string {
+	if len(seeds) == 0 {
+		return ""
+	}
+	seed := strings.TrimSpace(seeds[0])
+	if scheme := strings.Index(seed, "://"); scheme >= 0 {
+		seed = seed[scheme+3:]
+	}
+	host, _, err := net.SplitHostPort(seed)
+	if err == nil {
+		return strings.Trim(host, "[]")
+	}
+	return strings.TrimSpace(seed)
 }
 
 // buildTLSConfig 由 profile + secret 构建 TLS 配置（纯函数，单测覆盖）。

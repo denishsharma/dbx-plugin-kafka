@@ -70,7 +70,7 @@ func (s *Service) Connect(params *lifecycle.Params) error {
 	entry := &connEntry{
 		profile: profile,
 		secrets: secrets,
-		target:  connTarget{Host: params.Runtime.Host, Port: params.Runtime.Port},
+		target:  connTarget{Host: params.Runtime.Host, Port: params.Runtime.Port, Proxy: params.Runtime.Proxy},
 		status:  "idle",
 	}
 
@@ -100,7 +100,7 @@ func (s *Service) Test(ctx context.Context, params *lifecycle.Params) (string, e
 	entry := &connEntry{
 		profile: profile,
 		secrets: secrets,
-		target:  connTarget{Host: params.Runtime.Host, Port: params.Runtime.Port},
+		target:  connTarget{Host: params.Runtime.Host, Port: params.Runtime.Port, Proxy: params.Runtime.Proxy},
 		status:  "idle",
 	}
 

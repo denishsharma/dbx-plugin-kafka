@@ -142,8 +142,8 @@ func TestZooKeeperSelectionIgnoresPreviousBootstrapAndRuntimeSeeds(t *testing.T)
 		t.Fatalf("ZooKeeper mode kept inactive bootstrap seeds: %v", got)
 	}
 	entry.profile.ConnectionSource = ConnectionSourceBootstrap
-	if got := entry.seedBrokers(); len(got) != 1 || got[0] != "old-broker:9092" {
-		t.Fatalf("switching back did not restore bootstrap seeds: %v", got)
+	if got := entry.seedBrokers(); len(got) != 1 || got[0] != "old-tunnel:19092" {
+		t.Fatalf("switching back did not prefer the Host runtime endpoint: %v", got)
 	}
 }
 
@@ -166,6 +166,33 @@ func TestSeedBrokersFallback(t *testing.T) {
 	entry = &connEntry{}
 	if got := entry.seedBrokers(); got != nil {
 		t.Errorf("seedBrokers() = %v, want nil", got)
+	}
+}
+
+func TestSeedBrokersProxyRouteKeepsAdvertisedBrokerSeeds(t *testing.T) {
+	entry := &connEntry{
+		profile: Profile{BootstrapServers: []string{"broker-a:9092", "broker-b:9092"}},
+		target: connTarget{
+			Host:  "127.0.0.1",
+			Port:  49152,
+			Proxy: &lifecycle.RuntimeProxy{Type: "socks5", Host: "127.0.0.1", Port: 1080},
+		},
+	}
+	got := entry.seedBrokers()
+	if len(got) != 2 || got[0] != "broker-a:9092" || got[1] != "broker-b:9092" {
+		t.Fatalf("seedBrokers() = %v, want logical broker seeds for proxy routing", got)
+	}
+}
+
+func TestRuntimeProxyDialerValidation(t *testing.T) {
+	entry := &connEntry{target: connTarget{Proxy: &lifecycle.RuntimeProxy{Type: "http", Host: "proxy", Port: 8080}}}
+	if _, err := entry.runtimeProxyDialer(nil); err == nil || !strings.Contains(err.Error(), "only socks5") {
+		t.Fatalf("runtimeProxyDialer() error = %v, want unsupported proxy error", err)
+	}
+
+	entry.target.Proxy = &lifecycle.RuntimeProxy{Type: "socks5", Host: "", Port: 1080}
+	if _, err := entry.runtimeProxyDialer(nil); err == nil || !strings.Contains(err.Error(), "host and port are required") {
+		t.Fatalf("runtimeProxyDialer() error = %v, want missing endpoint error", err)
 	}
 }
 

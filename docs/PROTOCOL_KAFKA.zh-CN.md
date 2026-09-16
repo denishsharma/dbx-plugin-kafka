@@ -31,7 +31,7 @@
 
 | 方法 | 请求 | 返回（data） | 错误语义 |
 | --- | --- | --- | --- |
-| `connection/test` | `provider{id,databaseType:"kafka"}`、`connection{id,name,external_config,connection_secrets}`、`runtime{host,port}` | `{success:true}` | 拨号/认证失败 → `-32000`；连接参数缺失/非法 → `-32602` |
+| `connection/test` | `provider{id,databaseType:"kafka"}`、`connection{id,name,external_config,connection_secrets}`、`runtime{host,port,proxy?}` | `{success:true}` | 拨号/认证失败 → `-32000`；连接参数缺失/非法 → `-32602` |
 | `connection/connect` | 同上 | `{success:true}` | 同上；成功后按 `connectionId` 缓存 client（指纹失效重建） |
 | `connection/disconnect` | `connection{id}` | `{success:true}` | 释放缓存 client 与流式会话 |
 
@@ -43,6 +43,30 @@ oauth_token_source、msk_region、msk_access_key_id），`connection_secrets`
 为 secret binding 字段（sasl_password、tls_client_key、sr_password、
 glue_secret_access_key、glue_session_token、msk_secret_access_key、
 msk_session_token、oauth_static_token）。
+
+`runtime.host` / `runtime.port` 是 DBX Host transport layers 建立后的最终本地
+拨号端点；无结构化代理 route 时，插件必须优先拨该端点，不能自行重建 SSH、
+SOCKS5、HTTP CONNECT 或 HTTP tunnel。多 broker Kafka 还可由 Host 在 lifecycle
+请求中附加 `runtime.proxy`：
+
+```json
+{
+  "host": "127.0.0.1",
+  "port": 49152,
+  "proxy": {
+    "type": "socks5",
+    "host": "127.0.0.1",
+    "port": 1080,
+    "username": "optional",
+    "password": "secret"
+  }
+}
+```
+
+`proxy` 是可选扩展，`type` 目前仅支持 `socks5` / `socks5h`。存在该字段时，
+插件保留 bootstrap 与 Kafka advertised broker 地址，并让 admin、生产、一次性
+消费及流式消费共用 SOCKS5 dialer；`proxy.password` 只在生命周期请求内存中
+使用，不得写入日志、审计或响应。
 
 ## 3. 领域方法
 

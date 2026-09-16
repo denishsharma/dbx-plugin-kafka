@@ -31,8 +31,9 @@
   "无数据/零 lag"）、topic 分区健康视图（leader/replicas/ISR/offline）、
   消费组 offset 重置（host 有 `mq_reset_consumer_group_offsets`，插件同样提供）。
 - **不重复宿主**（M0 红线）：连接 profile 持久化、凭据 secret binding、
-  SSH 隧道/代理传输层（sidecar 经 `runtime.host:port` 拨号）、read_only
-  治理与审计基线全部走宿主。
+  SSH 隧道/代理传输层（sidecar 默认经 `runtime.host:port` 拨号；多 broker
+  场景若 Host 提供 `runtime.proxy`，sidecar 只使用该结构化 SOCKS5 route，
+  不读取或重建宿主的 tunnel profile）、read_only 治理与审计基线全部走宿主。
 
 ### 0.2 非目标
 

@@ -398,8 +398,15 @@ function syncConnectionContext() {
   void refreshBackendPolicy();
 }
 
+// 工作台统一使用自己的交互菜单；拦截原生 context menu，避免宿主/浏览器菜单
+// 覆盖插件内容。使用捕获阶段是为了覆盖 teleport 到 body 的弹窗区域。
+function preventNativeContextMenu(event: MouseEvent) {
+  event.preventDefault();
+}
+
 onMounted(() => {
   document.addEventListener("visibilitychange", onVisibilityChange);
+  document.addEventListener("contextmenu", preventNativeContextMenu, true);
   void initialize().catch((cause) => {
     initError.value = cause instanceof Error ? cause.message : String(cause);
   });
@@ -407,6 +414,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
+  document.removeEventListener("contextmenu", preventNativeContextMenu, true);
   window.clearTimeout(noticeTimer);
   uiIntent.stop();
   for (const dispose of [...unsubscribeAppearance, ...unsubscribeLocale, ...unsubscribeContext, ...unsubscribeEvent]) dispose();

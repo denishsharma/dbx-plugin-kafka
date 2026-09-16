@@ -84,6 +84,18 @@ describe("App a11y live regions (P2-24)", () => {
   });
 });
 
+describe("App context menu behavior", () => {
+  it("suppresses the native context menu across the workbench", async () => {
+    const wrapper = await mountApp();
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+
+    document.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    wrapper.unmount();
+  });
+});
+
 describe("App stream backpressure visibility (§8.3 遗留收口)", () => {
   it("notifies dropped buffered stream events after returning to the stream panel", async () => {
     const wrapper = await mountApp();

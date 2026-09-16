@@ -44,8 +44,7 @@ func TestServiceTestBootstrapDialFails(t *testing.T) {
 	// bootstrap 模式：127.0.0.1:1 立即拒绝 → 探活失败（覆盖 Test 主体拨号路径）。
 	service := NewService()
 	params := testParams(t, `{"connection":{"id":"boot-test","external_config":{
-		"bootstrap_servers": "127.0.0.1:1"}},
-		"runtime": {"host": "127.0.0.1", "port": 9092}}`)
+		"bootstrap_servers": "127.0.0.1:1"}}}`)
 	if _, err := service.Test(context.Background(), params); err == nil {
 		t.Fatal("unreachable bootstrap expected error")
 	}
