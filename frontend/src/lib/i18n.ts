@@ -596,6 +596,18 @@ export const messages = {
       planApplied: "Plan applied",
       needGroup: "Select a consumer group first",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Export TSV",
+      internalToggle: "Show internal topics",
+      favoriteAdd: "Favorite topic",
+      favoriteRemove: "Unfavorite topic",
+    },
+    schemaWrite: {
+      normalize: "Normalize",
+      normalizeHint: "Ask the registry to normalize the stored schema text (Confluent only)",
+      editorPlaceholder: "Paste or edit the schema definition",
+    },
     produceAdv: {
       acks: "Required acks",
       idempotence: "Idempotent producer",
@@ -608,18 +620,6 @@ export const messages = {
     connProps: {
       summary: "{mapped} mapped · {ignored} ignored",
       ignoredKeys: "Ignored keys: {keys}",
-    },
-    schemaWrite: {
-      normalize: "Normalize",
-      normalizeHint: "Ask the registry to normalize the stored schema text (Confluent only)",
-      editorPlaceholder: "Paste or edit the schema definition",
-    },
-    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
-    polish: {
-      exportTsv: "Export TSV",
-      internalToggle: "Show internal topics",
-      favoriteAdd: "Favorite topic",
-      favoriteRemove: "Unfavorite topic",
     },
   },
   "zh-CN": {
@@ -1215,6 +1215,18 @@ export const messages = {
       planApplied: "方案已应用",
       needGroup: "请先选择消费组",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "导出 TSV",
+      internalToggle: "显示内部 topic",
+      favoriteAdd: "收藏 topic",
+      favoriteRemove: "取消收藏",
+    },
+    schemaWrite: {
+      normalize: "归一化",
+      normalizeHint: "要求注册表归一化存储的 schema 文本（仅 Confluent）",
+      editorPlaceholder: "粘贴或编辑 schema 定义",
+    },
     produceAdv: {
       acks: "确认级别 (acks)",
       idempotence: "幂等生产者",
@@ -1227,18 +1239,6 @@ export const messages = {
     connProps: {
       summary: "已映射 {mapped} 项 · 已忽略 {ignored} 项",
       ignoredKeys: "忽略的键：{keys}",
-    },
-    schemaWrite: {
-      normalize: "归一化",
-      normalizeHint: "要求注册表归一化存储的 schema 文本（仅 Confluent）",
-      editorPlaceholder: "粘贴或编辑 schema 定义",
-    },
-    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
-    polish: {
-      exportTsv: "导出 TSV",
-      internalToggle: "显示内部 topic",
-      favoriteAdd: "收藏 topic",
-      favoriteRemove: "取消收藏",
     },
   },
   "zh-TW": {
@@ -1834,6 +1834,18 @@ export const messages = {
       planApplied: "方案已套用",
       needGroup: "請先選擇消費群組",
     },
+    // Lane4 前端打磨文案（TSV 匯出 / internal 顯隱 / 收藏星標）。
+    polish: {
+      exportTsv: "匯出 TSV",
+      internalToggle: "顯示內部 topic",
+      favoriteAdd: "收藏 topic",
+      favoriteRemove: "取消收藏",
+    },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "要求登錄檔正規化儲存的 schema 文字（僅 Confluent）",
+      editorPlaceholder: "貼上或編輯 schema 定義",
+    },
     produceAdv: {
       acks: "確認級別 (acks)",
       idempotence: "冪等生產者",
@@ -1846,18 +1858,6 @@ export const messages = {
     connProps: {
       summary: "已映射 {mapped} 項 · 已忽略 {ignored} 項",
       ignoredKeys: "忽略的鍵：{keys}",
-    },
-    schemaWrite: {
-      normalize: "正規化",
-      normalizeHint: "要求登錄檔正規化儲存的 schema 文字（僅 Confluent）",
-      editorPlaceholder: "貼上或編輯 schema 定義",
-    },
-    // Lane4 前端打磨文案（TSV 匯出 / internal 顯隱 / 收藏星標）。
-    polish: {
-      exportTsv: "匯出 TSV",
-      internalToggle: "顯示內部 topic",
-      favoriteAdd: "收藏 topic",
-      favoriteRemove: "取消收藏",
     },
   },
   es: {
@@ -2453,6 +2453,18 @@ export const messages = {
       planApplied: "Plan aplicado",
       needGroup: "Seleccione primero un grupo de consumo",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Exportar TSV",
+      internalToggle: "Mostrar topics internos",
+      favoriteAdd: "Marcar topic como favorito",
+      favoriteRemove: "Quitar de favoritos",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pide al registro normalizar el texto del esquema almacenado (solo Confluent)",
+      editorPlaceholder: "Pega o edita la definición del esquema",
+    },
     produceAdv: {
       acks: "ACKs requeridos",
       idempotence: "Productor idempotente",
@@ -2465,18 +2477,6 @@ export const messages = {
     connProps: {
       summary: "{mapped} mapeadas · {ignored} ignoradas",
       ignoredKeys: "Claves ignoradas: {keys}",
-    },
-    schemaWrite: {
-      normalize: "Normalizar",
-      normalizeHint: "Pide al registro normalizar el texto del esquema almacenado (solo Confluent)",
-      editorPlaceholder: "Pega o edita la definición del esquema",
-    },
-    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
-    polish: {
-      exportTsv: "Exportar TSV",
-      internalToggle: "Mostrar topics internos",
-      favoriteAdd: "Marcar topic como favorito",
-      favoriteRemove: "Quitar de favoritos",
     },
   },
   it: {
@@ -3072,6 +3072,18 @@ export const messages = {
       planApplied: "Piano applicato",
       needGroup: "Seleziona prima un gruppo di consumo",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Esporta TSV",
+      internalToggle: "Mostra topic interni",
+      favoriteAdd: "Aggiungi topic ai preferiti",
+      favoriteRemove: "Rimuovi dai preferiti",
+    },
+    schemaWrite: {
+      normalize: "Normalizza",
+      normalizeHint: "Chiede al registro di normalizzare il testo dello schema memorizzato (solo Confluent)",
+      editorPlaceholder: "Incolla o modifica la definizione dello schema",
+    },
     produceAdv: {
       acks: "ACK richiesti",
       idempotence: "Producer idempotente",
@@ -3084,18 +3096,6 @@ export const messages = {
     connProps: {
       summary: "{mapped} mappate · {ignored} ignorate",
       ignoredKeys: "Chiavi ignorate: {keys}",
-    },
-    schemaWrite: {
-      normalize: "Normalizza",
-      normalizeHint: "Chiede al registro di normalizzare il testo dello schema memorizzato (solo Confluent)",
-      editorPlaceholder: "Incolla o modifica la definizione dello schema",
-    },
-    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
-    polish: {
-      exportTsv: "Esporta TSV",
-      internalToggle: "Mostra topic interni",
-      favoriteAdd: "Aggiungi topic ai preferiti",
-      favoriteRemove: "Rimuovi dai preferiti",
     },
   },
   ja: {
@@ -3691,6 +3691,18 @@ export const messages = {
       planApplied: "プランを適用しました",
       needGroup: "先にコンシューマーグループを選択してください",
     },
+    // Lane4 前端打磨文案（TSV エクスポート / internal 表示切替 / お気に入り）。
+    polish: {
+      exportTsv: "TSV をエクスポート",
+      internalToggle: "内部 topic を表示",
+      favoriteAdd: "topic をお気に入りに追加",
+      favoriteRemove: "お気に入りから削除",
+    },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "レジストリに保存時のスキーマテキストの正規化を依頼します（Confluent のみ）",
+      editorPlaceholder: "スキーマ定義を貼り付けまたは編集",
+    },
     produceAdv: {
       acks: "確認応答 (acks)",
       idempotence: "冪等プロデューサー",
@@ -3703,18 +3715,6 @@ export const messages = {
     connProps: {
       summary: "マッピング {mapped} 件 · 無視 {ignored} 件",
       ignoredKeys: "無視されたキー: {keys}",
-    },
-    schemaWrite: {
-      normalize: "正規化",
-      normalizeHint: "レジストリに保存時のスキーマテキストの正規化を依頼します（Confluent のみ）",
-      editorPlaceholder: "スキーマ定義を貼り付けまたは編集",
-    },
-    // Lane4 前端打磨文案（TSV エクスポート / internal 表示切替 / お気に入り）。
-    polish: {
-      exportTsv: "TSV をエクスポート",
-      internalToggle: "内部 topic を表示",
-      favoriteAdd: "topic をお気に入りに追加",
-      favoriteRemove: "お気に入りから削除",
     },
   },
   "pt-BR": {
@@ -4310,6 +4310,18 @@ export const messages = {
       planApplied: "Plano aplicado",
       needGroup: "Selecione primeiro um grupo de consumo",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Exportar TSV",
+      internalToggle: "Mostrar tópicos internos",
+      favoriteAdd: "Favoritar tópico",
+      favoriteRemove: "Desfavoritar tópico",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pede ao Registry para normalizar o texto do esquema armazenado (somente Confluent)",
+      editorPlaceholder: "Cole ou edite a definição do esquema",
+    },
     produceAdv: {
       acks: "ACKs exigidos",
       idempotence: "Produtor idempotente",
@@ -4322,18 +4334,6 @@ export const messages = {
     connProps: {
       summary: "{mapped} mapeadas · {ignored} ignoradas",
       ignoredKeys: "Chaves ignoradas: {keys}",
-    },
-    schemaWrite: {
-      normalize: "Normalizar",
-      normalizeHint: "Pede ao Registry para normalizar o texto do esquema armazenado (somente Confluent)",
-      editorPlaceholder: "Cole ou edite a definição do esquema",
-    },
-    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
-    polish: {
-      exportTsv: "Exportar TSV",
-      internalToggle: "Mostrar tópicos internos",
-      favoriteAdd: "Favoritar tópico",
-      favoriteRemove: "Desfavoritar tópico",
     },
   },
 };
