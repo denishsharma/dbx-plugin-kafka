@@ -17,10 +17,10 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.26
 	github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk v0.0.0-00010101000000-000000000000
 	github.com/twmb/franz-go v1.21.6
-	github.com/twmb/franz-go/pkg/kadm v1.17.2
+	github.com/twmb/franz-go/pkg/kadm v1.18.0
 	github.com/twmb/franz-go/pkg/kmsg v1.13.1
 	github.com/twmb/franz-go/pkg/sasl/kerberos v1.1.0
-	golang.org/x/net v0.49.0
+	golang.org/x/net v0.52.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -42,7 +42,7 @@ require (
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 )
 
 // SDK vendored 以便独立 checkout 构建（shared/sdk/go/dbx-plugin-sdk，拆分基线

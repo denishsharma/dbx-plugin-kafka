@@ -239,22 +239,16 @@ func (s *Service) ResetGroupOffsets(ctx context.Context, req GroupOffsetResetReq
 			}
 		}
 
-		_, commitErr := admin.CommitOffsets(ctx, group, targets)
-		// 逐分区结果。
-		result.Rows = []OffsetResetRow{}
-		targets.Each(func(offset kadm.Offset) {
-			row := OffsetResetRow{Topic: offset.Topic, Partition: offset.Partition, OK: commitErr == nil}
-			if commitErr != nil {
-				row.Error = commitErr.Error()
-			}
-			result.Rows = append(result.Rows, row)
-		})
-		sort.Slice(result.Rows, func(i, j int) bool {
-			if result.Rows[i].Topic != result.Rows[j].Topic {
-				return result.Rows[i].Topic < result.Rows[j].Topic
-			}
-			return result.Rows[i].Partition < result.Rows[j].Partition
-		})
+		// CommitOffsets 只在传输层失败时返回 error；broker 的逐分区错误码
+		// （UNKNOWN_TOPIC_ID / UNKNOWN_MEMBER_ID / COORDINATOR_LOAD_IN_PROGRESS
+		// 等）落在 responses 里。只看外层 error 会把被拒绝的提交误报为
+		// ok=true，调用方随后读到未提交的 offset（K15 回归面）。
+		commits, commitErr := admin.CommitOffsets(ctx, group, targets)
+		rows, commitFailure := offsetResetRows(targets, commits, commitErr)
+		result.Rows = rows
+		if commitFailure != nil {
+			return commitFailure
+		}
 		return nil
 	})
 	if err != nil {
@@ -263,6 +257,51 @@ func (s *Service) ResetGroupOffsets(ctx context.Context, req GroupOffsetResetReq
 	}
 	s.emitAuditSource(req.Source, req.ConnectionID, "group-offsets-reset", group, "success", sprintf("resetTo=%s", mode))
 	return &result, nil
+}
+
+// offsetResetRows 把一次提交的目标 offset 与 broker 响应合并成逐分区结果。
+// 任一分区被拒绝即返回错误（reset 未落盘绝不能报告成功）；错误信息点名
+// topic/partition 与 broker 错误码，便于定位。
+func offsetResetRows(targets kadm.Offsets, commits kadm.OffsetResponses, commitErr error) ([]OffsetResetRow, error) {
+	rows := []OffsetResetRow{}
+	var failure error
+	targets.Each(func(offset kadm.Offset) {
+		row := OffsetResetRow{Topic: offset.Topic, Partition: offset.Partition, OK: true}
+		switch {
+		case commitErr != nil:
+			row.OK = false
+			row.Error = commitErr.Error()
+			if failure == nil {
+				failure = commitErr
+			}
+		default:
+			// 响应缺失同样按失败处理：无法确认落盘的 reset 不得报成功
+			// （kadm 对缺失分区填 errOffsetCommitMissing，这里再兜一层）。
+			response, ok := commits.Lookup(offset.Topic, offset.Partition)
+			switch {
+			case !ok:
+				row.OK = false
+				row.Error = "partition missing from commit response"
+				if failure == nil {
+					failure = errf("commit offset for %s/%d was not acknowledged by the broker", offset.Topic, offset.Partition)
+				}
+			case response.Err != nil:
+				row.OK = false
+				row.Error = response.Err.Error()
+				if failure == nil {
+					failure = errf("commit offset for %s/%d was rejected: %v", offset.Topic, offset.Partition, response.Err)
+				}
+			}
+		}
+		rows = append(rows, row)
+	})
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Topic != rows[j].Topic {
+			return rows[i].Topic < rows[j].Topic
+		}
+		return rows[i].Partition < rows[j].Partition
+	})
+	return rows, failure
 }
 
 // normalizeResetMode 归一化 resetTo。

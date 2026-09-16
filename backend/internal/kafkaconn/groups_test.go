@@ -12,7 +12,65 @@ import (
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
+
+// TestOffsetResetRowsSurfacesCommitRejection：提交被 broker 逐分区拒绝时必须
+// 返回错误而不是 ok=true。Kafka 4.x 的 UNKNOWN_TOPIC_ID（OffsetCommit v10 起
+// 用 topic id 取代 topic name）曾经被外层 error 吞掉，MCP reset 报告成功但
+// committed offset 仍是 -1（K15 回归面）。
+func TestOffsetResetRowsSurfacesCommitRejection(t *testing.T) {
+	targets := kadm.Offsets{}
+	targets.AddOffset("orders", 0, 6, -1)
+	targets.AddOffset("orders", 1, 3, -1)
+
+	// broker 接受：逐分区 ok、无错误。
+	commits := kadm.OffsetResponses{
+		"orders": {
+			0: kadm.OffsetResponse{Offset: kadm.Offset{Topic: "orders", Partition: 0, At: 6}},
+			1: kadm.OffsetResponse{Offset: kadm.Offset{Topic: "orders", Partition: 1, At: 3}},
+		},
+	}
+	rows, err := offsetResetRows(targets, commits, nil)
+	if err != nil || len(rows) != 2 || !rows[0].OK || !rows[1].OK {
+		t.Fatalf("accepted commit: rows=%+v err=%v", rows, err)
+	}
+	if rows[0].Topic != "orders" || rows[1].Partition != 1 {
+		t.Fatalf("rows must stay sorted by topic/partition: %+v", rows)
+	}
+
+	// 逐分区拒绝：row 带 broker 错误码，整体报错（点名 topic/partition）。
+	rejected := kadm.OffsetResponses{
+		"orders": {
+			0: kadm.OffsetResponse{Offset: kadm.Offset{Topic: "orders", Partition: 0, At: 6}},
+			1: kadm.OffsetResponse{Offset: kadm.Offset{Topic: "orders", Partition: 1, At: 3}, Err: kerr.UnknownTopicID},
+		},
+	}
+	rows, err = offsetResetRows(targets, rejected, nil)
+	if err == nil || !strings.Contains(err.Error(), "orders/1") {
+		t.Fatalf("rejected partition must surface with topic/partition: %v", err)
+	}
+	if len(rows) != 2 || !rows[0].OK || rows[1].OK || rows[1].Error == "" {
+		t.Fatalf("rejected commit rows=%+v", rows)
+	}
+
+	// 响应缺失分区：同样不得报成功。
+	rows, err = offsetResetRows(targets, kadm.OffsetResponses{"orders": {
+		0: kadm.OffsetResponse{Offset: kadm.Offset{Topic: "orders", Partition: 0, At: 6}},
+	}}, nil)
+	if err == nil || !strings.Contains(err.Error(), "orders/1") {
+		t.Fatalf("missing partition must surface: %v", err)
+	}
+
+	// 传输层错误：全部分区标失败，错误原样透出。
+	rows, err = offsetResetRows(targets, nil, errors.New("dial tcp 127.0.0.1:9092: connect: connection refused"))
+	if err == nil || !strings.Contains(err.Error(), "connection refused") {
+		t.Fatalf("transport error must surface: %v", err)
+	}
+	if len(rows) != 2 || rows[0].OK || rows[1].OK {
+		t.Fatalf("transport error rows=%+v", rows)
+	}
+}
 
 func TestCommittedTopics(t *testing.T) {
 	committed := kadm.OffsetResponses{
