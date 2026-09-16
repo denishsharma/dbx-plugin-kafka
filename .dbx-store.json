@@ -15,7 +15,7 @@
   "source": "https://github.com/jinpy666/dbx-plugin-kafka",
   "homepage": "https://github.com/jinpy666/dbx-plugin-kafka",
   "license": "MIT",
-  "releaseNotes": "首个商店版本（Kafka Studio）：在一个 DBX 工作台中管理 Apache Kafka——topic/分区/消费组巡检、消息生产与消费（本地聚合 digest、cursor 翻页与流式导出）、消费组 lag 监控与受控 offset 重置、topic/ACL 运维，支持 PLAINTEXT/TLS/SASL（PLAIN/SCRAM）、Kerberos、OAUTHBEARER 与 Confluent/AWS Glue Schema Registry；工作台界面提供 7 种语言（en/zh-CN/zh-TW/es/it/ja/pt-BR）；写操作受只读、allowDelete 与两阶段确认保护，并提供 11 个 MCP 工具供 AI 自动化调用。",
+  "releaseNotes": "修复 DBX 隧道/代理下的 Kafka 连接：插件改为拨宿主下发的最终端点 runtime.host:port，并在宿主下发 runtime.proxy 时让所有 broker（含 advertised.listeners 发现的）共用同一个 SOCKS5 dialer，admin/生产/一次性消费/流式消费一致生效；代理路径补齐 TLS 握手与按 broker 的 SNI。消费组 offset 重置修复 Kafka 4.x 误报成功的问题（OffsetCommit v10 起以 topic id 标识主题，旧提交被 broker 以 UNKNOWN_TOPIC_ID 拒绝），任一分区被拒即返回错误。Fixes Kafka connections behind DBX transport/proxy layers: the sidecar now dials the host-provided runtime endpoint and, when the host publishes runtime.proxy, routes every broker (including brokers discovered via advertised.listeners) through one SOCKS5 dialer shared by admin, produce, one-shot consume and stream clients, with the TLS handshake and per-broker SNI applied after the proxy CONNECT. Consumer-group offset reset now commits by topic id for Kafka 4.x (OffsetCommit v10+) instead of being rejected as UNKNOWN_TOPIC_ID and misreported as success.",
   "localizations": {
     "zh-CN": {
       "name": "Kafka Studio",
