@@ -15,6 +15,7 @@ export const messages = {
     save: "Save",
     delete: "Delete",
     copied: "Copied",
+    grid: { copyValue: "Copy value", copyRow: "Copy row" },
     intent: {
       applied: "MCP intent applied to the workbench",
       rejected: "MCP intent rejected: {reason}",
@@ -634,6 +635,7 @@ export const messages = {
     save: "保存",
     delete: "删除",
     copied: "已复制",
+    grid: { copyValue: "复制值", copyRow: "复制行" },
     intent: {
       applied: "MCP 意图已落到工作台",
       rejected: "MCP 意图被拒绝：{reason}",
@@ -1253,6 +1255,7 @@ export const messages = {
     save: "儲存",
     delete: "刪除",
     copied: "已複製",
+    grid: { copyValue: "複製值", copyRow: "複製列" },
     intent: {
       applied: "MCP 意圖已套用至工作台",
       rejected: "MCP 意圖被拒絕：{reason}",
@@ -1872,6 +1875,7 @@ export const messages = {
     save: "Guardar",
     delete: "Eliminar",
     copied: "Copiado",
+    grid: { copyValue: "Copiar valor", copyRow: "Copiar fila" },
     intent: {
       applied: "Intención MCP aplicada al banco de trabajo",
       rejected: "Intención MCP rechazada: {reason}",
@@ -2491,6 +2495,7 @@ export const messages = {
     save: "Salva",
     delete: "Elimina",
     copied: "Copiato",
+    grid: { copyValue: "Copia valore", copyRow: "Copia riga" },
     intent: {
       applied: "Intent MCP applicato al workbench",
       rejected: "Intent MCP rifiutato: {reason}",
@@ -3110,6 +3115,7 @@ export const messages = {
     save: "保存",
     delete: "削除",
     copied: "コピーしました",
+    grid: { copyValue: "値をコピー", copyRow: "行をコピー" },
     intent: {
       applied: "MCP インテントをワークベンチに適用しました",
       rejected: "MCP インテントは拒否されました：{reason}",
@@ -3729,6 +3735,7 @@ export const messages = {
     save: "Salvar",
     delete: "Excluir",
     copied: "Copiado",
+    grid: { copyValue: "Copiar valor", copyRow: "Copiar linha" },
     intent: {
       applied: "Intenção MCP aplicada ao workbench",
       rejected: "Intenção MCP rejeitada: {reason}",

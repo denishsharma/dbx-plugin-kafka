@@ -4,7 +4,7 @@
 // --ag-* CSS 变量对齐主题令牌（light/dark 随宿主 data-theme 切换，两套都成立）。
 // 内建：排序/列内过滤/分页 + 页大小 localStorage 持久化（kafkaColumns 存取）、
 // 窄容器（< GRID_COMPACT_WIDTH）降级 minimal 列集、单行选择与行点击事件。
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -23,6 +23,17 @@ import {
   minimalColumns,
   savePreferredPageSize,
 } from "../lib/kafkaColumns";
+import { copyTextToClipboard } from "../lib/kafkaModel";
+import { t } from "../lib/i18n";
+
+export interface GridContextMenuItem {
+  id: string;
+  label: string;
+  action: (row: unknown) => void;
+  disabled?: boolean | ((row: unknown) => boolean);
+  danger?: boolean;
+  separatorBefore?: boolean;
+}
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -41,6 +52,8 @@ const props = withDefaults(
     emitRowClick?: boolean;
     /** 即时搜索（F6-1）：quickFilterText 只过滤已加载行（防抖在调用方）。 */
     quickFilter?: string;
+    /** 行右键管理项；复制值/复制行始终由网格提供。 */
+    contextMenuItems?: GridContextMenuItem[] | ((row: unknown) => GridContextMenuItem[]);
   }>(),
   { compactFields: undefined, rowSelection: "single", rowClassRules: undefined, emitRowClick: true, quickFilter: "" },
 );
@@ -49,6 +62,7 @@ const emit = defineEmits<{
   (e: "rowClick", data: unknown): void;
   (e: "selectionChanged", data: unknown | null): void;
   (e: "pageSizeChanged", size: number): void;
+  (e: "copy", text: string): void;
 }>();
 
 const host = ref<HTMLElement>();
@@ -56,6 +70,75 @@ const pageSize = ref(loadPreferredPageSize(props.tableKey));
 let gridApi: GridApi | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let compactActive = false;
+const contextMenu = ref<{ x: number; y: number; row: unknown; value: string } | null>(null);
+
+const contextItems = computed(() => {
+  const current = contextMenu.value;
+  if (!current) return [] as Array<GridContextMenuItem & { resolvedDisabled: boolean }>;
+  const custom = typeof props.contextMenuItems === "function" ? props.contextMenuItems(current.row) : props.contextMenuItems ?? [];
+  const copyItems: GridContextMenuItem[] = [
+    {
+      id: "copy-value",
+      label: t("grid.copyValue"),
+      action: () => void copyToClipboard(current.value),
+      disabled: current.value.length === 0,
+    },
+    {
+      id: "copy-row",
+      label: t("grid.copyRow"),
+      action: () => void copyToClipboard(rowText(current.row)),
+    },
+  ];
+  return [...copyItems, ...custom].map((item) => ({
+    ...item,
+    resolvedDisabled: typeof item.disabled === "function" ? item.disabled(current.row) : item.disabled === true,
+  }));
+});
+
+function rowText(row: unknown): string {
+  if (!row || typeof row !== "object") return String(row ?? "");
+  const record = row as Record<string, unknown>;
+  const defs = compactActive && props.compactFields ? minimalColumns(props.columnDefs, props.compactFields) : props.columnDefs;
+  const fields = defs.map((def) => def.field).filter((field): field is string => typeof field === "string");
+  if (fields.length === 0) return JSON.stringify(record, null, 2);
+  return fields
+    .map((field) => {
+      const value = record[field];
+      if (value === undefined || value === null) return "";
+      return typeof value === "object" ? JSON.stringify(value) : String(value);
+    })
+    .join("\t");
+}
+
+async function copyToClipboard(text: string) {
+  if (!text) return;
+  const copied = await copyTextToClipboard(text);
+  if (copied) emit("copy", text);
+}
+
+function closeContextMenu() {
+  contextMenu.value = null;
+}
+
+function onContextMenuKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") closeContextMenu();
+}
+
+function openContextMenu(event: Parameters<NonNullable<GridOptions["onCellContextMenu"]>>[0]) {
+  const nativeEvent = event.event as MouseEvent | undefined;
+  if (!event.node?.data || !nativeEvent) return;
+  nativeEvent.preventDefault();
+  nativeEvent.stopPropagation();
+  const value = event.value === undefined || event.value === null ? "" : String(event.value);
+  const menuWidth = 220;
+  const menuHeight = 38 + (typeof props.contextMenuItems === "function" ? props.contextMenuItems(event.node.data).length : props.contextMenuItems?.length ?? 0) * 30;
+  contextMenu.value = {
+    x: Math.max(6, Math.min(nativeEvent.clientX, window.innerWidth - menuWidth - 6)),
+    y: Math.max(6, Math.min(nativeEvent.clientY, window.innerHeight - menuHeight - 6)),
+    row: event.node.data,
+    value,
+  };
+}
 
 // 行 id：VM 带 id 字段（消息/位点类）直接用；其余按对象身份分配稳定自增 id
 // （重复空串 id 会让 ag-grid 行覆盖合并——走查发现的 subject 表 bug）。
@@ -117,6 +200,7 @@ function buildOptions(): GridOptions {
         emit("pageSizeChanged", size);
       }
     },
+    onCellContextMenu: openContextMenu,
   };
 }
 
@@ -139,11 +223,15 @@ onMounted(() => {
     }
   });
   resizeObserver.observe(host.value);
+  document.addEventListener("pointerdown", closeContextMenu);
+  document.addEventListener("keydown", onContextMenuKeydown);
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  document.removeEventListener("pointerdown", closeContextMenu);
+  document.removeEventListener("keydown", onContextMenuKeydown);
   gridApi?.destroy();
   gridApi = null;
 });
@@ -186,6 +274,21 @@ defineExpose({ goToLatest });
 
 <template>
   <div ref="host" class="dbx-grid ag-theme-quartz" />
+  <div
+    v-if="contextMenu"
+    class="context-menu dbx-grid-context-menu"
+    :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+    role="menu"
+    @pointerdown.stop
+    @contextmenu.prevent.stop
+  >
+    <template v-for="item in contextItems" :key="item.id">
+      <hr v-if="item.separatorBefore" />
+      <button type="button" :class="{ danger: item.danger }" :disabled="item.resolvedDisabled" role="menuitem" @click="item.action(contextMenu!.row); closeContextMenu()">
+        {{ item.label }}
+      </button>
+    </template>
+  </div>
 </template>
 
 <style scoped>

@@ -307,8 +307,8 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .destructive-copy > div { min-width: 0; }
 .destructive-copy strong { display: block; overflow-wrap: anywhere; }
 .destructive-copy p { margin: 5px 0 0; line-height: 1.5; }
-.destructive-icon { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive); }
-.destructive-icon svg { width: 16px; height: 16px; }
+.destructive-icon { display: grid; width: 28px; height: 28px; flex: 0 0 28px; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--destructive) 12%, transparent); color: var(--destructive); }
+.destructive-icon svg { width: 13px; height: 13px; }
 .entry-dn { overflow-wrap: anywhere; font-family: var(--mono-font-family); font-size: 11px; color: var(--muted-foreground); }
 
 .form-error { margin: 0; color: var(--destructive); font-size: 11px; overflow-wrap: anywhere; }
@@ -532,6 +532,19 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   --ag-header-cell-hover-background-color: transparent;
   --ag-header-cell-moving-background-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
+/* 网格内部是唯一需要保留原生滚动条的工作区。全局工作台会隐藏滚动条，
+   若不在这里恢复，数据多于视口时只能靠滚轮摸索，尤其触控板/键盘用户
+   无法判断还有未见行。AG Grid 的 viewport 由主题运行时创建，故在这里
+   恢复细窄、与 DBX 令牌一致的滚动条。 */
+.dbx-grid,
+.dbx-grid * {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
+}
+.dbx-grid *::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
+.dbx-grid *::-webkit-scrollbar-track { background: transparent; }
+.dbx-grid *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted-foreground) 55%, transparent); background-clip: padding-box; }
+.dbx-grid *::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground)); background-clip: padding-box; }
 /* 行内单元格/行级状态（健康列、Monitor 阈值告警行高亮） */
 .dbx-cell-ok { color: var(--success); }
 .dbx-cell-bad { color: var(--destructive); }

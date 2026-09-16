@@ -6,7 +6,7 @@
 import { computed, onMounted, ref } from "vue";
 import { RefreshCw, Trash2 } from "@lucide/vue";
 import type { ColDef } from "ag-grid-community";
-import DbxAgGrid from "./DbxAgGrid.vue";
+import DbxAgGrid, { type GridContextMenuItem } from "./DbxAgGrid.vue";
 import { kafkaApi, type GroupMember, type GroupOffsetRow, type KafkaGroup } from "../lib/api";
 import {
   MINIMAL_GROUP_FIELDS,
@@ -27,7 +27,7 @@ import { useModalBehavior } from "../lib/modalBehavior";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";
 
-defineProps<{
+const props = defineProps<{
   canWrite: boolean;
   canDelete: boolean;
 }>();
@@ -52,6 +52,16 @@ const offsetGridRows = computed(() => toGroupOffsetRows(offsetRows.value));
 const offsetGridCols = computed(() => groupOffsetColumns() as ColDef<GroupOffsetVm>[]);
 const memberGridRows = computed(() => toMemberRows(members.value));
 const memberGridCols = computed(() => memberColumns() as ColDef<MemberVm>[]);
+
+function groupContextMenuItems(row: unknown): GridContextMenuItem[] {
+  const group = (row as GroupRow | undefined)?.raw;
+  if (!group) return [];
+  return [
+    { id: "group-describe", label: t("groups.describe"), action: () => selectGroup(row as GroupRow) },
+    { id: "group-reset", label: t("groups.reset"), action: () => { selected.value = group; askReset(); }, disabled: !props.canWrite },
+    { id: "group-delete", label: t("groups.delete"), action: () => { selected.value = group; askDelete(); }, disabled: !props.canDelete, danger: true, separatorBefore: true },
+  ];
+}
 
 // reset dialog
 const resetOpen = ref(false);
@@ -226,6 +236,7 @@ onMounted(() => {
         :row-data="groupGridRows"
         :column-defs="groupGridCols"
         :compact-fields="MINIMAL_GROUP_FIELDS"
+        :context-menu-items="groupContextMenuItems"
         row-selection="single"
         @selection-changed="(row: unknown) => selectGroup(row as GroupRow | null)"
       />

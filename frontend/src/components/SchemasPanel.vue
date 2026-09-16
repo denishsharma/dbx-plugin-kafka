@@ -10,7 +10,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { GitCompare, Plus, RefreshCw, ShieldQuestion, Trash2, X } from "@lucide/vue";
 import type { ColDef } from "ag-grid-community";
-import DbxAgGrid from "./DbxAgGrid.vue";
+import DbxAgGrid, { type GridContextMenuItem } from "./DbxAgGrid.vue";
 import CodeEditor from "./CodeEditor.vue";
 import SchemaTree from "./SchemaTree.vue";
 import {
@@ -200,6 +200,25 @@ const versionGridRows = computed(() => toSchemaVersionRows(versions.value));
 const versionGridCols = computed(() => schemaVersionColumns({ onClone: (row) => void cloneVersion(row) }) as ColDef<SchemaVersionVm>[]);
 const versionOptions = computed(() => versions.value.map((row) => row.version));
 const schemaText = computed(() => (detail.value ? prettyJson(detail.value.schema) : ""));
+
+function subjectContextMenuItems(row: unknown): GridContextMenuItem[] {
+  const subject = (row as SubjectVm | undefined)?.subject;
+  if (!subject) return [];
+  return [
+    { id: "schema-open", label: t("schemas.viewSchema"), action: () => void selectSubject(row as SubjectVm) },
+    { id: "schema-register", label: t("schemas.register"), action: () => { selectedSubject.value = subject; openRegister(); }, disabled: !props.canWrite },
+    { id: "schema-delete", label: t("schemas.deleteSubject"), action: () => { selectedSubject.value = subject; askDeleteSubject(); }, disabled: !props.canDelete, danger: true, separatorBefore: true },
+  ];
+}
+
+function versionContextMenuItems(row: unknown): GridContextMenuItem[] {
+  const version = (row as SchemaVersionVm | undefined)?.version;
+  if (version === undefined) return [];
+  return [
+    { id: "schema-clone", label: t("schemas.clone"), action: () => void cloneVersion(row as SchemaVersionVm), disabled: !props.canWrite },
+    { id: "schema-delete-version", label: t("schemas.deleteVersion"), action: () => { selectedVersion.value = version; askDeleteVersion(); }, disabled: !props.canDelete, danger: true, separatorBefore: true },
+  ];
+}
 
 // F5 树视图：详情区 树/文本 toggle（缺省文本 = 既有行为；PROTOBUF 树化后续）。
 const viewMode = ref<"text" | "tree">("text");
@@ -558,6 +577,7 @@ onMounted(async () => {
         :row-data="subjectGridRows"
         :column-defs="subjectGridCols"
         :compact-fields="MINIMAL_SUBJECT_FIELDS"
+        :context-menu-items="subjectContextMenuItems"
         row-selection="single"
         @selection-changed="(row: unknown) => selectSubject(row as SubjectVm | null)"
       />
@@ -599,6 +619,7 @@ onMounted(async () => {
           :row-data="versionGridRows"
           :column-defs="versionGridCols"
           :compact-fields="MINIMAL_VERSION_FIELDS"
+          :context-menu-items="versionContextMenuItems"
           row-selection="single"
           @selection-changed="(row: unknown) => row && viewVersion((row as SchemaVersionVm).version)"
         />

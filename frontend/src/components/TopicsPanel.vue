@@ -7,7 +7,7 @@
 import { computed, ref, watch } from "vue";
 import { Plus, RefreshCw, Trash2, TrendingUp, Wrench } from "@lucide/vue";
 import type { ColDef } from "ag-grid-community";
-import DbxAgGrid from "./DbxAgGrid.vue";
+import DbxAgGrid, { type GridContextMenuItem } from "./DbxAgGrid.vue";
 import { kafkaApi, type ConfigEntry, type KafkaTopic, type TopicOffsetRow, type TopicPartitionInfo } from "../lib/api";
 import {
   MINIMAL_PARTITION_FIELDS,
@@ -107,6 +107,18 @@ const canDeleteTopic = computed(() => props.canWrite && props.canDelete);
 // round4 面 1：错误正文走 friendlyKafkaError（与 TopicTree 同源），原文留 title。
 const friendlyError = computed(() => (props.error ? friendlyKafkaError(props.error) : ""));
 const errorDetail = computed(() => (props.error && friendlyError.value !== props.error ? props.error : ""));
+
+function topicContextMenuItems(row: unknown): GridContextMenuItem[] {
+  const topic = (row as TopicVm | undefined)?.raw;
+  if (!topic) return [];
+  return [
+    { id: "topic-describe", label: t("topics.describe"), action: () => { selected.value = topic; void describeSelected(); } },
+    { id: "topic-offsets", label: t("topics.offsets"), action: () => { selected.value = topic; void queryOffsets(); } },
+    { id: "topic-config", label: t("topics.configGet"), action: () => void openConfig(topic) },
+    { id: "topic-expand", label: t("topics.expand"), action: () => openExpand(topic), disabled: !canManage.value },
+    { id: "topic-delete", label: t("topics.delete"), action: () => askDelete(topic), disabled: !canDeleteTopic.value, danger: true, separatorBefore: true },
+  ];
+}
 
 function selectTopic(topic: KafkaTopic | null) {
   selected.value = topic;
@@ -336,6 +348,7 @@ watch(
         :row-data="topicGridRows"
         :column-defs="topicGridCols"
         :compact-fields="MINIMAL_TOPIC_FIELDS"
+        :context-menu-items="topicContextMenuItems"
         row-selection="single"
         @selection-changed="(row: unknown) => selectTopic((row as TopicVm | null)?.raw ?? null)"
       />

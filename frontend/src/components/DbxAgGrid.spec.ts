@@ -11,6 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import DbxAgGrid from "./DbxAgGrid.vue";
+import type { GridContextMenuItem } from "./DbxAgGrid.vue";
 import { GRID_COMPACT_WIDTH } from "../lib/kafkaColumns";
 import type { ColDef, GridOptions } from "ag-grid-community";
 
@@ -164,5 +165,23 @@ describe("DbxAgGrid", () => {
     };
     expect(api.paginationGoToLastPage).toHaveBeenCalledTimes(1);
     expect(api.ensureIndexVisible).toHaveBeenCalledWith(4, "bottom");
+  });
+
+  it("opens the copy and custom management actions from a row context menu", async () => {
+    const manage = vi.fn();
+    const contextMenuItems: GridContextMenuItem[] = [{ id: "manage", label: "Manage row", action: manage }];
+    const wrapper = mountGrid({ contextMenuItems });
+    gridMock.created[0].options.onCellContextMenu?.({
+      node: { data: row },
+      value: "alpha",
+      event: new MouseEvent("contextmenu", { clientX: 20, clientY: 20 }),
+    } as never);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find(".context-menu").text()).toContain("复制值");
+    expect(wrapper.find(".context-menu").text()).toContain("复制行");
+    const manageButton = wrapper.findAll(".context-menu button").find((button) => button.text() === "Manage row");
+    expect(manageButton).toBeDefined();
+    await manageButton!.trigger("click");
+    expect(manage).toHaveBeenCalledWith(row);
   });
 });
