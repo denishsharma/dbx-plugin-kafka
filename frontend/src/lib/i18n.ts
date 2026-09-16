@@ -614,6 +614,13 @@ export const messages = {
       normalizeHint: "Ask the registry to normalize the stored schema text (Confluent only)",
       editorPlaceholder: "Paste or edit the schema definition",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Export TSV",
+      internalToggle: "Show internal topics",
+      favoriteAdd: "Favorite topic",
+      favoriteRemove: "Unfavorite topic",
+    },
   },
   "zh-CN": {
     hostApiUnavailable: "DBX Host API 不可用",
@@ -1225,6 +1232,13 @@ export const messages = {
       normalize: "归一化",
       normalizeHint: "要求注册表归一化存储的 schema 文本（仅 Confluent）",
       editorPlaceholder: "粘贴或编辑 schema 定义",
+    },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "导出 TSV",
+      internalToggle: "显示内部 topic",
+      favoriteAdd: "收藏 topic",
+      favoriteRemove: "取消收藏",
     },
   },
   "zh-TW": {
@@ -1838,6 +1852,13 @@ export const messages = {
       normalizeHint: "要求登錄檔正規化儲存的 schema 文字（僅 Confluent）",
       editorPlaceholder: "貼上或編輯 schema 定義",
     },
+    // Lane4 前端打磨文案（TSV 匯出 / internal 顯隱 / 收藏星標）。
+    polish: {
+      exportTsv: "匯出 TSV",
+      internalToggle: "顯示內部 topic",
+      favoriteAdd: "收藏 topic",
+      favoriteRemove: "取消收藏",
+    },
   },
   es: {
     hostApiUnavailable: "La API Host de DBX no está disponible",
@@ -2449,6 +2470,13 @@ export const messages = {
       normalize: "Normalizar",
       normalizeHint: "Pide al registro normalizar el texto del esquema almacenado (solo Confluent)",
       editorPlaceholder: "Pega o edita la definición del esquema",
+    },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Exportar TSV",
+      internalToggle: "Mostrar topics internos",
+      favoriteAdd: "Marcar topic como favorito",
+      favoriteRemove: "Quitar de favoritos",
     },
   },
   it: {
@@ -3062,6 +3090,13 @@ export const messages = {
       normalizeHint: "Chiede al registro di normalizzare il testo dello schema memorizzato (solo Confluent)",
       editorPlaceholder: "Incolla o modifica la definizione dello schema",
     },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Esporta TSV",
+      internalToggle: "Mostra topic interni",
+      favoriteAdd: "Aggiungi topic ai preferiti",
+      favoriteRemove: "Rimuovi dai preferiti",
+    },
   },
   ja: {
     hostApiUnavailable: "DBX Host API を利用できません",
@@ -3674,6 +3709,13 @@ export const messages = {
       normalizeHint: "レジストリに保存時のスキーマテキストの正規化を依頼します（Confluent のみ）",
       editorPlaceholder: "スキーマ定義を貼り付けまたは編集",
     },
+    // Lane4 前端打磨文案（TSV エクスポート / internal 表示切替 / お気に入り）。
+    polish: {
+      exportTsv: "TSV をエクスポート",
+      internalToggle: "内部 topic を表示",
+      favoriteAdd: "topic をお気に入りに追加",
+      favoriteRemove: "お気に入りから削除",
+    },
   },
   "pt-BR": {
     hostApiUnavailable: "API Host do DBX indisponível",
@@ -4285,6 +4327,13 @@ export const messages = {
       normalize: "Normalizar",
       normalizeHint: "Pede ao Registry para normalizar o texto do esquema armazenado (somente Confluent)",
       editorPlaceholder: "Cole ou edite a definição do esquema",
+    },
+    // Lane4 前端打磨文案（TSV 导出 / internal 显隐 / 收藏星标）。
+    polish: {
+      exportTsv: "Exportar TSV",
+      internalToggle: "Mostrar tópicos internos",
+      favoriteAdd: "Favoritar tópico",
+      favoriteRemove: "Desfavoritar tópico",
     },
   },
 };
