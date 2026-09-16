@@ -609,6 +609,11 @@ export const messages = {
       summary: "{mapped} mapped · {ignored} ignored",
       ignoredKeys: "Ignored keys: {keys}",
     },
+    schemaWrite: {
+      normalize: "Normalize",
+      normalizeHint: "Ask the registry to normalize the stored schema text (Confluent only)",
+      editorPlaceholder: "Paste or edit the schema definition",
+    },
   },
   "zh-CN": {
     hostApiUnavailable: "DBX Host API 不可用",
@@ -1215,6 +1220,11 @@ export const messages = {
     connProps: {
       summary: "已映射 {mapped} 项 · 已忽略 {ignored} 项",
       ignoredKeys: "忽略的键：{keys}",
+    },
+    schemaWrite: {
+      normalize: "归一化",
+      normalizeHint: "要求注册表归一化存储的 schema 文本（仅 Confluent）",
+      editorPlaceholder: "粘贴或编辑 schema 定义",
     },
   },
   "zh-TW": {
@@ -1823,6 +1833,11 @@ export const messages = {
       summary: "已映射 {mapped} 項 · 已忽略 {ignored} 項",
       ignoredKeys: "忽略的鍵：{keys}",
     },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "要求登錄檔正規化儲存的 schema 文字（僅 Confluent）",
+      editorPlaceholder: "貼上或編輯 schema 定義",
+    },
   },
   es: {
     hostApiUnavailable: "La API Host de DBX no está disponible",
@@ -2429,6 +2444,11 @@ export const messages = {
     connProps: {
       summary: "{mapped} mapeadas · {ignored} ignoradas",
       ignoredKeys: "Claves ignoradas: {keys}",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pide al registro normalizar el texto del esquema almacenado (solo Confluent)",
+      editorPlaceholder: "Pega o edita la definición del esquema",
     },
   },
   it: {
@@ -3037,6 +3057,11 @@ export const messages = {
       summary: "{mapped} mappate · {ignored} ignorate",
       ignoredKeys: "Chiavi ignorate: {keys}",
     },
+    schemaWrite: {
+      normalize: "Normalizza",
+      normalizeHint: "Chiede al registro di normalizzare il testo dello schema memorizzato (solo Confluent)",
+      editorPlaceholder: "Incolla o modifica la definizione dello schema",
+    },
   },
   ja: {
     hostApiUnavailable: "DBX Host API を利用できません",
@@ -3644,6 +3669,11 @@ export const messages = {
       summary: "マッピング {mapped} 件 · 無視 {ignored} 件",
       ignoredKeys: "無視されたキー: {keys}",
     },
+    schemaWrite: {
+      normalize: "正規化",
+      normalizeHint: "レジストリに保存時のスキーマテキストの正規化を依頼します（Confluent のみ）",
+      editorPlaceholder: "スキーマ定義を貼り付けまたは編集",
+    },
   },
   "pt-BR": {
     hostApiUnavailable: "API Host do DBX indisponível",
@@ -4250,6 +4280,11 @@ export const messages = {
     connProps: {
       summary: "{mapped} mapeadas · {ignored} ignoradas",
       ignoredKeys: "Chaves ignoradas: {keys}",
+    },
+    schemaWrite: {
+      normalize: "Normalizar",
+      normalizeHint: "Pede ao Registry para normalizar o texto do esquema armazenado (somente Confluent)",
+      editorPlaceholder: "Cole ou edite a definição do esquema",
     },
   },
 };

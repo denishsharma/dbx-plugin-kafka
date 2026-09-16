@@ -189,11 +189,17 @@ func (c *schemaRegistryClient) getSchemaByID(ctx context.Context, id int) (Schem
 	return meta, nil
 }
 
-func (c *schemaRegistryClient) registerSchema(ctx context.Context, subject string, format, schema string, refs []SchemaReference) (SchemaMeta, error) {
+func (c *schemaRegistryClient) registerSchema(ctx context.Context, subject string, format, schema string, refs []SchemaReference, normalize bool) (SchemaMeta, error) {
+	// normalize 是 Confluent REST 的可选查询参数（SR 侧归一化存储文本；
+	// 缺省不发参数，保持与老 sidecar/代理的最大兼容）。
+	path := "/subjects/" + url.PathEscape(subject) + "/versions"
+	if normalize {
+		path += "?" + url.Values{"normalize": {"true"}}.Encode()
+	}
 	var registered struct {
 		ID int `json:"id"`
 	}
-	err := c.request(ctx, http.MethodPost, "/subjects/"+url.PathEscape(subject)+"/versions", schemaRegisterRequest{
+	err := c.request(ctx, http.MethodPost, path, schemaRegisterRequest{
 		Schema:     schema,
 		SchemaType: format,
 		References: refs,
@@ -454,6 +460,9 @@ type SchemaRegisterRequest struct {
 	// Compatibility 仅 glue CreateSchema（schema 不存在时）使用；
 	// 取值面见 normalizeGlueCompatibility，缺省 NONE。
 	Compatibility string `json:"compatibility,omitempty"`
+	// Normalize 仅 confluent 后端生效（POST …/versions?normalize=true，SR
+	// 侧归一化存储文本）；glue 无归一化语义 → 显式 -32000 报错不静默忽略。
+	Normalize bool `json:"normalize,omitempty"`
 }
 
 // SchemaRegisterResult 对应 kafka/schema/register。
@@ -493,7 +502,7 @@ type schemaBackend interface {
 	getCompatibility(ctx context.Context, subject string) (string, error)
 	setCompatibility(ctx context.Context, subject, level string, version int64) (string, error)
 	checkCompatibility(ctx context.Context, subject string, version int64, format, schema string, refs []SchemaReference) (bool, []string, error)
-	registerSchema(ctx context.Context, subject, format, schema string, refs []SchemaReference, compatibility string) (SchemaMeta, error)
+	registerSchema(ctx context.Context, subject, format, schema string, refs []SchemaReference, compatibility string, normalize bool) (SchemaMeta, error)
 	deleteSchema(ctx context.Context, subject string, version int64) ([]int64, error)
 }
 
@@ -609,8 +618,8 @@ func (b *confluentBackend) checkCompatibility(ctx context.Context, subject strin
 	return b.client.checkCompatibility(ctx, subject, version, format, schema, refs)
 }
 
-func (b *confluentBackend) registerSchema(ctx context.Context, subject, format, schema string, refs []SchemaReference, _ string) (SchemaMeta, error) {
-	return b.client.registerSchema(ctx, subject, format, schema, refs)
+func (b *confluentBackend) registerSchema(ctx context.Context, subject, format, schema string, refs []SchemaReference, _ string, normalize bool) (SchemaMeta, error) {
+	return b.client.registerSchema(ctx, subject, format, schema, refs, normalize)
 }
 
 func (b *confluentBackend) deleteSchema(ctx context.Context, subject string, version int64) ([]int64, error) {
@@ -928,7 +937,7 @@ func (s *Service) RegisterSchema(ctx context.Context, req SchemaRegisterRequest)
 	ctx, cancel := context.WithTimeout(ctx, adminTimeout)
 	defer cancel()
 
-	meta, err := backend.registerSchema(ctx, subject, format, req.Schema, refs, req.Compatibility)
+	meta, err := backend.registerSchema(ctx, subject, format, req.Schema, refs, req.Compatibility, req.Normalize)
 	if err != nil {
 		s.emitAudit(req.ConnectionID, "schema-register", subject, "error", err.Error())
 		return nil, err
