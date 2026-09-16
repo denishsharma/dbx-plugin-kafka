@@ -68,6 +68,21 @@ SOCKS5、HTTP CONNECT 或 HTTP tunnel。多 broker Kafka 还可由 Host 在 life
 消费及流式消费共用 SOCKS5 dialer；`proxy.password` 只在生命周期请求内存中
 使用，不得写入日志、审计或响应。
 
+**Host 前提（重要）**：本插件按 manifest 约定不绑定 `host`/`port` 字段，
+broker 端点来自 `bootstrap_servers`（config binding）。因此只有 Host 做到
+以下任一项，transport layers（SSH / SOCKS5 / HTTP CONNECT / HTTP tunnel）
+才能真正作用到 Kafka：
+
+1. 由 Host 依据 provider 配置推导隧道终点并把本地转发端口放进
+   `runtime.host:port`（单端点场景）；或
+2. Host 下发结构化 `runtime.proxy`（多 broker / advertised.listeners 场景，
+   这是 Kafka 的标准形态）。
+
+Host API 1.0 的 `plugin_connection_params` 只发送 `runtime.host:port`，且
+`connection_remote_endpoint` 对 `db_type=plugin` 取 `connection.host/port`；
+插件未绑定该字段时隧道终点为空。此时插件已不再绕开 Host 端点（会拨
+`runtime.host:port`），但多 broker 连通性仍取决于 Host 侧补齐上述契约。
+
 ## 3. 领域方法
 
 ### 3.1 brokers
