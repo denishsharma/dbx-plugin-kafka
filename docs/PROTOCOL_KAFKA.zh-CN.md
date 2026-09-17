@@ -546,7 +546,7 @@ AWS Glue schema management is available"；双配置歧义/未知 registry →
 | --- | --- | --- | --- |
 | `topic` | string | 必填 | 目标 topic |
 | `groupId` | string? | — | 消费组 id；**与 `partitions` 互斥**（同给 → `-32602`） |
-| `offsetStrategy` | enum | `latest` | `latest` / `earliest` / `committed` / `timestamp` / `offset` |
+| `offsetStrategy` | enum | `latest` | `latest` / `recent` / `earliest` / `committed` / `timestamp` / `offset`；`recent` = 每分区从日志末端回退扫描窗口（max(maxScan, limit)）条起读，浏览型查询的推荐值 |
 | `offsetTime` | string? | — | strategy=timestamp：RFC3339 或 unix 毫秒 |
 | `partitions` | int[]? | — | 指定分区（有值时禁 `groupId`） |
 | `partitionOffsets` | map<partition,int>? | — | strategy=offset 时**必填** |

@@ -750,7 +750,9 @@ func parseTimestampMillis(value string) (int64, error) {
 }
 
 // consumeOffset 解析 offset 策略为 kgo.Offset（tinyrdm kafkaConsumeOffset :2125）。
-func consumeOffset(strategy, offsetTime string, hasGroup, directPartitions bool) (kgo.Offset, error) {
+// recent = 每分区从「日志末端回退 recentWindow 条」起读（浏览型查询默认值：
+// latest 只尾巴等待新消息，历史消息永远扫不到，见 issue #16）。
+func consumeOffset(strategy, offsetTime string, hasGroup, directPartitions bool, recentWindow int64) (kgo.Offset, error) {
 	raw := strings.ToLower(trimSpace(strategy))
 	if raw == "" || raw == "default" {
 		if directPartitions {
@@ -762,6 +764,11 @@ func consumeOffset(strategy, offsetTime string, hasGroup, directPartitions bool)
 	switch raw {
 	case "latest", "end":
 		offset = kgo.NewOffset().AtEnd()
+	case "recent", "last":
+		if recentWindow < 1 {
+			recentWindow = 1
+		}
+		offset = kgo.NewOffset().AtEnd().Relative(-recentWindow)
 	case "earliest", "start":
 		offset = kgo.NewOffset().AtStart()
 	case "timestamp", "time", "by-time", "by_time":
@@ -779,7 +786,7 @@ func consumeOffset(strategy, offsetTime string, hasGroup, directPartitions bool)
 		}
 		offset = kgo.NewOffset().AtCommitted()
 	default:
-		return kgo.Offset{}, errf("offsetStrategy must be latest, earliest, committed, timestamp, or offset")
+		return kgo.Offset{}, errf("offsetStrategy must be latest, recent, earliest, committed, timestamp, or offset")
 	}
 	return offset, nil
 }
@@ -789,6 +796,7 @@ func consumeOffset(strategy, offsetTime string, hasGroup, directPartitions bool)
 // kafkaConsumePartitionExactOffsets 的必填校验）。
 func buildConsumeOpts(params ConsumeParams, topic, groupID string, partitions []int32, partitionOffsets map[int32]int64, isolation kgo.IsolationLevel) ([]kgo.Opt, error) {
 	var opts []kgo.Opt
+	recentWindow := int64(consumeMaxScanRecords(params.Limit, params.MaxScanRecords))
 	opts = append(opts, kgo.FetchIsolationLevel(isolation))
 	// 禁自动提交仅 group 模式有意义（franz-go 对无 group 的
 	// DisableAutoCommit 直接拒建 client）；commit=true 场景必有 groupId
@@ -815,7 +823,7 @@ func buildConsumeOpts(params ConsumeParams, topic, groupID string, partitions []
 				topic: topicPartitions,
 			}))
 		} else {
-			offset, err := consumeOffset(params.OffsetStrategy, params.OffsetTime, false, true)
+			offset, err := consumeOffset(params.OffsetStrategy, params.OffsetTime, false, true, recentWindow)
 			if err != nil {
 				return nil, err
 			}
@@ -832,7 +840,7 @@ func buildConsumeOpts(params ConsumeParams, topic, groupID string, partitions []
 			opts = append(opts, kgo.ConsumerGroup(groupID))
 		}
 		if trimSpace(params.OffsetStrategy) != "" && normalizeOffsetStrategyName(params.OffsetStrategy) != "default" {
-			offset, err := consumeOffset(params.OffsetStrategy, params.OffsetTime, groupID != "", false)
+			offset, err := consumeOffset(params.OffsetStrategy, params.OffsetTime, groupID != "", false, recentWindow)
 			if err != nil {
 				return nil, err
 			}

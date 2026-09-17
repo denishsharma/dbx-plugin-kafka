@@ -8,7 +8,7 @@
  * 方法契约：IMPL_PLAN_DBX_KAFKA §5（新方法必须同步 PROTOCOL_KAFKA 文档）。
  */
 
-export type OffsetStrategy = "latest" | "earliest" | "committed" | "timestamp" | "offset";
+export type OffsetStrategy = "latest" | "recent" | "earliest" | "committed" | "timestamp" | "offset";
 export type IsolationLevel = "read_uncommitted" | "read_committed";
 export type MatchMode = "contains" | "prefix" | "exact" | "regex";
 export type DecodeMode = "none" | "base64";

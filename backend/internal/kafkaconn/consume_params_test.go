@@ -50,11 +50,11 @@ func TestValidateConsumeParamsMutualExclusion(t *testing.T) {
 	}
 
 	// committed 策略必须 groupId（consumeOffset 层校验）。
-	if _, err := consumeOffset("committed", "", false, false); err == nil {
+	if _, err := consumeOffset("committed", "", false, false, 0); err == nil {
 		t.Error("committed without groupId expected error")
 	}
 	// committed 策略不能与 partitions 组合。
-	if _, err := consumeOffset("committed", "", true, true); err == nil {
+	if _, err := consumeOffset("committed", "", true, true, 0); err == nil {
 		t.Error("committed + partitions expected error")
 	}
 
@@ -71,11 +71,33 @@ func TestValidateConsumeParamsMutualExclusion(t *testing.T) {
 	}
 
 	// timestamp 策略必须 offsetTime。
-	if _, err := consumeOffset("timestamp", "", false, false); err == nil {
+	if _, err := consumeOffset("timestamp", "", false, false, 0); err == nil {
 		t.Error("timestamp without offsetTime expected error")
 	}
-	if _, err := consumeOffset("timestamp", "1700000000000", false, false); err != nil {
+	if _, err := consumeOffset("timestamp", "1700000000000", false, false, 0); err != nil {
 		t.Errorf("timestamp with ms error = %v", err)
+	}
+
+	// recent 策略：相对末端回退窗口（issue #16）。kgo.Offset 的 relative
+	// 字段未导出，用 MarshalJSON 断言（relative≠0 时才带 "Relative" 键）。
+	marshalOffset := func(o kgo.Offset) string {
+		raw, _ := o.MarshalJSON()
+		return string(raw)
+	}
+	recent, err := consumeOffset("recent", "", false, false, 500)
+	if err != nil {
+		t.Fatalf("recent error = %v", err)
+	}
+	if got := marshalOffset(recent); !strings.Contains(got, `"Relative":-500`) {
+		t.Errorf("recent offset = %s, want relative -500 to log end", got)
+	}
+	// 窗口非正时钳到 1 条（至少读末端前 1 条，不退化为纯 tail）。
+	clamped, err := consumeOffset("recent", "", false, false, 0)
+	if err != nil {
+		t.Fatalf("recent(0) error = %v", err)
+	}
+	if got := marshalOffset(clamped); !strings.Contains(got, `"Relative":-1`) {
+		t.Errorf("recent(0) offset = %s, want relative -1", got)
 	}
 
 	// 范围 from > to 拒绝。
@@ -105,6 +127,8 @@ func TestConsumeOffsetStrategies(t *testing.T) {
 	}{
 		{"default", "", "", false, false, false},
 		{"latest", "latest", "", false, false, false},
+		{"recent", "recent", "", false, false, false},
+		{"recent alias last", "last", "", false, true, false},
 		{"earliest", "earliest", "", false, true, false},
 		{"committed with group", "committed", "", true, false, false},
 		{"committed without group", "committed", "", false, false, true},
@@ -115,7 +139,7 @@ func TestConsumeOffsetStrategies(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := consumeOffset(tc.strategy, tc.offsetTime, tc.hasGroup, tc.partitions)
+			_, err := consumeOffset(tc.strategy, tc.offsetTime, tc.hasGroup, tc.partitions, 100)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("consumeOffset(%q) error = %v, wantErr %v", tc.strategy, err, tc.wantErr)
 			}

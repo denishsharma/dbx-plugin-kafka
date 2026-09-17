@@ -55,7 +55,7 @@ func allToolDefinitions() []map[string]any {
 			map[string]any{
 				"connectionId":   connectionProperty(),
 				"topic":          map[string]any{"type": "string", "description": "Topic to consume"},
-				"offsetStrategy": map[string]any{"type": "string", "enum": []string{"latest", "earliest", "committed", "timestamp", "offset"}, "description": "Offset strategy (default latest)"},
+				"offsetStrategy": map[string]any{"type": "string", "enum": []string{"latest", "recent", "earliest", "committed", "timestamp", "offset"}, "description": "Offset strategy (default latest; recent starts each partition scanWindow records before the log end)"},
 				"limit":          map[string]any{"type": "integer", "description": "Max matched messages fetched"},
 				"filter":         map[string]any{"type": "string", "description": "Full-text filter (key+value+headers)"},
 				"keyFilter":      map[string]any{"type": "string", "description": "Key channel filter"},
@@ -109,7 +109,7 @@ func allToolDefinitions() []map[string]any {
 			map[string]any{
 				"connectionId":   connectionProperty(),
 				"topic":          map[string]any{"type": "string", "description": "Topic to scan"},
-				"offsetStrategy": map[string]any{"type": "string", "enum": []string{"latest", "earliest", "committed", "timestamp", "offset"}, "description": "Offset strategy (default earliest)"},
+				"offsetStrategy": map[string]any{"type": "string", "enum": []string{"latest", "recent", "earliest", "committed", "timestamp", "offset"}, "description": "Offset strategy (default earliest; recent starts each partition scanWindow records before the log end)"},
 				"offsetTime":     map[string]any{"type": "string", "description": "RFC3339 / unix ms (offsetStrategy=timestamp)"},
 				"partitions":     map[string]any{"type": "array", "items": map[string]any{"type": "integer"}, "description": "Explicit partition list (integers; numeric strings or one comma-separated string also accepted)"},
 				"maxScanRecords": map[string]any{"type": "integer", "description": "Scan budget (default 1000, max 100000; consume maxScanRecords semantics; numeric strings tolerated)"},

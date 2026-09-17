@@ -87,7 +87,9 @@ function onTopicSelect(name: string) {
 // -- form state ---------------------------------------------------------------
 
 const groupId = ref("");
-const offsetStrategy = ref<OffsetStrategy>("latest");
+// 默认 recent（每分区从日志末端回退扫描窗口起读）：latest 只等新消息，查历史
+// 永远「已扫描 0」（issue #16）；流式面板不受影响（订阅语义本就是 tail）。
+const offsetStrategy = ref<OffsetStrategy>("recent");
 const offsetTimeText = ref("");
 const partitionsText = ref("");
 const partitionOffsetsText = ref("");
@@ -152,6 +154,7 @@ function toggleFormOpen() {
 // 摘要 chips：策略文案映射（无新增 i18n key，复用既有 strategy*/formatRaw）。
 const STRATEGY_LABEL_KEYS: Record<OffsetStrategy, string> = {
   latest: "messages.strategyLatest",
+  recent: "messages.strategyRecent",
   earliest: "messages.strategyEarliest",
   committed: "messages.strategyCommitted",
   timestamp: "messages.strategyTimestamp",
@@ -525,7 +528,7 @@ async function runConsume(options: { topicOverride?: string } = {}) {
 
 const INTENT_CELL_WIDTH = 120;
 
-const INTENT_STRATEGIES: OffsetStrategy[] = ["latest", "earliest", "committed", "timestamp", "offset"];
+const INTENT_STRATEGIES: OffsetStrategy[] = ["recent", "latest", "earliest", "committed", "timestamp", "offset"];
 
 function truncateIntentCell(value: string): string {
   return [...value].length > INTENT_CELL_WIDTH ? `${[...value].slice(0, INTENT_CELL_WIDTH).join("")}…` : value;
@@ -679,7 +682,7 @@ async function applyPreset(id: string) {
     if (!preset) return;
     const params = preset.params ?? {};
     groupId.value = params.groupId ?? "";
-    offsetStrategy.value = params.offsetStrategy ?? "latest";
+    offsetStrategy.value = params.offsetStrategy ?? "recent";
     offsetTimeText.value = typeof params.offsetTime === "string" ? params.offsetTime : params.offsetTime ? String(params.offsetTime) : "";
     partitionsText.value = (params.partitions ?? []).join(",");
     partitionOffsetsText.value = Object.entries(params.partitionOffsets ?? {})
@@ -968,6 +971,7 @@ watch(() => props.topic, () => void loadPresets(), { immediate: true });
             <label class="field">
               <span>{{ t("messages.offsetStrategy") }}</span>
               <select v-model="offsetStrategy">
+                <option value="recent">{{ t("messages.strategyRecent") }}</option>
                 <option value="latest">{{ t("messages.strategyLatest") }}</option>
                 <option value="earliest">{{ t("messages.strategyEarliest") }}</option>
                 <option value="committed">{{ t("messages.strategyCommitted") }}</option>
