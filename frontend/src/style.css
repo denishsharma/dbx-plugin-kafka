@@ -17,6 +17,16 @@
   --ui-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono-font-family: "Cascadia Mono", Consolas, monospace;
   --radius: 6px;
+  /* 间距节奏令牌（4/6/8/10/12/16）：区块标题、表单行距、工具条/元信息内边距
+     统一引用，避免各面板各自取值漂移。 */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 10px;
+  --space-5: 12px;
+  --space-6: 16px;
+  /* 交互微状态过渡时长：hover/focus 的底色/描边/文字色统一 120ms。 */
+  --motion-fast: 120ms;
   color: var(--foreground);
   background: var(--background);
   font-family: var(--ui-font-family);
@@ -32,7 +42,17 @@
 html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 1px solid var(--primary); outline-offset: -1px; }
+/* 微状态过渡：底色/描边/文字色/透明度统一短过渡（reduced-motion 下整体停用，
+   见文件尾 media 块）。 */
+button, input, select, textarea {
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease, opacity var(--motion-fast) ease;
+}
+/* 键盘焦点环：2px 主色描边（WCAG 2.2 focus-appearance 的最小实践宽度），
+   primary 在明（3.7:1）/暗（5.0:1）底上均 ≥3:1 非文本对比。内缩 1px 不裁切。 */
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: -1px; }
+/* 主色实底按钮上主色环不可见：改用按钮前景色描边。 */
+.primary-button:focus-visible, .qb-join button.is-active:focus-visible { outline-color: var(--primary-foreground); }
 .hidden { display: none !important; }
 .muted { color: var(--muted-foreground); }
 .mono { font-family: var(--mono-font-family); }
@@ -60,7 +80,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   justify-content: space-between;
   gap: 8px;
   border-bottom: 1px solid var(--border);
-  padding: 0 8px;
+  padding: 0 var(--space-3);
   background: color-mix(in srgb, var(--background) 92%, transparent);
 }
 
@@ -97,6 +117,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
    复选框可见禁用（dark/light 随令牌）。面板特例（如生产面板发送按钮降饱和）
    仍留在各面板 scoped 层叠加。 */
 button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
+/* 禁用按钮统一降饱和：对齐 Groups/Topics/Schemas 等面板既有 filter: grayscale(.4)
+   前例，补齐此前未覆盖的模态/表单按钮（面板 scoped 更强规则仍优先生效）。 */
+button:disabled { filter: grayscale(.4); }
 .checkbox input[type="checkbox"]:disabled { opacity: .45; }
 .checkbox input[type="checkbox"]:disabled + span { opacity: .55; }
 .icon-button svg, .toolbar-button svg, .context-menu svg, .panel-header svg {
@@ -140,11 +163,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 /* Left: DN tree pane（宽度由 TopicTree 组件经 --tree-pane-width 注入，180–480px，
    折叠态收成 40px 竖条，见文件尾「侧栏收空间」块） */
 .tree-pane { position: relative; display: flex; height: 100%; width: var(--tree-pane-width, 240px); min-width: 180px; max-width: 480px; flex: 0 0 auto; flex-direction: column; background: var(--background); }
-.panel-header { height: 34px; min-height: 34px; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--border); padding: 0 8px; font-size: 12px; font-weight: 600; }
+.panel-header { height: 34px; min-height: 34px; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--border); padding: 0 var(--space-3); font-size: 12px; font-weight: 600; }
 .panel-header .panel-title { display: flex; min-width: 0; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .panel-header svg { width: 14px; height: 14px; flex: 0 0 14px; }
 .panel-header .actions { display: flex; align-items: center; gap: 2px; }
-.tree-filter { display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border); padding: 6px 8px; }
+.tree-filter { display: flex; align-items: center; gap: 5px; border-bottom: 1px solid var(--border); padding: var(--space-2) var(--space-3); }
 .tree-filter input {
   min-width: 0; flex: 1; height: 26px;
   border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
@@ -166,8 +189,11 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .tree-twist svg { width: 12px; height: 12px; }
 .tree-label { min-width: 0; flex: 1; display: flex; align-items: center; gap: 6px; }
 .tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-badge { flex: 0 0 auto; border-radius: 999px; padding: 0 6px; background: color-mix(in srgb, var(--muted-foreground) 22%, transparent); color: var(--muted-foreground); font-size: 10px; font-variant-numeric: tabular-nums; }
-.tree-state { display: flex; align-items: center; gap: 8px; padding: 14px 10px; color: var(--muted-foreground); font-size: 12px; }
+/* 计数徽标：纯 muted-foreground 落在自身 22% 底上时亮色主题仅 ~3.6:1，
+   向前景混 20% 提到 ≥4.5:1（暗色同样小幅提升），底色饱和度不动。 */
+.tree-badge { flex: 0 0 auto; border-radius: 999px; padding: 0 6px; background: color-mix(in srgb, var(--muted-foreground) 22%, transparent); color: color-mix(in srgb, var(--muted-foreground) 80%, var(--foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+/* 空态/树状态同一节奏：16px/10px 内边距 + 8px 间距 + 12px 字号（与 .empty 对齐）。 */
+.tree-state { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-6) var(--space-4); color: var(--muted-foreground); font-size: 12px; }
 
 /* Zero-dependency virtual scroller (VirtualList.vue): fixed row height,
    absolutely positioned rows inside a spacer-sized inner box. Nesting depth
@@ -178,13 +204,13 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .tree-vlist .vlist-row { height: 28px; }
 .tree-vlist .tree-node { display: block; height: 28px; padding: 0; }
 .tree-vlist .tree-row { height: 28px; min-height: 0; }
-.tree-error { color: var(--destructive); font-size: 11px; padding: 6px 10px; overflow-wrap: anywhere; }
+.tree-error { color: var(--destructive); font-size: 11px; padding: var(--space-2) var(--space-4); overflow-wrap: anywhere; }
 .spinning { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Right: search + results */
 .main-pane { position: relative; display: flex; height: 100%; min-width: 0; flex: 1; flex-direction: column; background: var(--background); }
-.search-form { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(150px, 1fr) minmax(90px, 130px) minmax(90px, 120px) auto; gap: 6px; border-bottom: 1px solid var(--border); padding: 8px; }
+.search-form { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(150px, 1fr) minmax(90px, 130px) minmax(90px, 120px) auto; gap: var(--space-2); border-bottom: 1px solid var(--border); padding: var(--space-3); }
 .search-form .field { display: flex; min-width: 0; flex-direction: column; gap: 3px; font-size: 10px; color: var(--muted-foreground); }
 .search-form input, .search-form select {
   min-width: 0; height: 26px;
@@ -252,10 +278,10 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .col-resize:hover { background: color-mix(in srgb, var(--primary) 35%, transparent); border-radius: 2px; }
 .tree-badge--loading { opacity: .7; }
 .result-table { outline: none; }
-.result-table:focus-visible { outline: 1px solid color-mix(in srgb, var(--primary) 55%, transparent); outline-offset: -1px; }
+.result-table:focus-visible { outline: 2px solid var(--primary); outline-offset: -1px; }
 
 .result-pane { display: flex; min-height: 0; flex: 1; flex-direction: column; }
-.result-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 10px; color: var(--muted-foreground); font-size: 11px; }
+.result-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: var(--space-1) var(--space-4); color: var(--muted-foreground); font-size: 11px; }
 .result-table { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .result-header, .result-row { display: grid; min-width: 100%; align-items: center; column-gap: 6px; padding: 0 8px; }
 .result-header { position: sticky; top: 0; z-index: 3; height: 26px; min-height: 26px; border-bottom: 1px solid var(--border); background: var(--background); box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 8%, transparent); color: var(--muted-foreground); font-size: 11px; user-select: none; }
@@ -271,8 +297,8 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .pager { display: flex; align-items: center; gap: 6px; }
 .pager button { border: 1px solid var(--border); border-radius: 4px; background: var(--background); min-height: 22px; padding: 0 8px; cursor: pointer; }
 .pager button:disabled { opacity: .4; }
-.empty { display: flex; min-height: 120px; align-items: center; justify-content: center; gap: 8px; padding: 16px; color: var(--muted-foreground); font-size: 12px; text-align: center; }
-.empty.compact { min-height: 42px; padding: 8px; }
+.empty { display: flex; min-height: 120px; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-6); color: var(--muted-foreground); font-size: 12px; text-align: center; }
+.empty.compact { min-height: 42px; padding: var(--space-3); }
 /* grid-box 是 row 向 flex 容器：空态 p 作为 flex item 默认按内容宽靠左，
    撑满后才谈得上自身 justify-content 的水平居中（结果区/未消费空态共用）。 */
 .grid-box > .empty { flex: 1 1 auto; }
@@ -371,7 +397,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 /* Tab bar（工作台九面板切换）：窄视口/长语言下横向滚动兜底（页签不压缩变形），
    尾部选中 topic 徽标限宽省略（长 topic 名不再撑爆页签栏，悬停 title 看全名）。 */
-.tab-bar { display: flex; min-height: 30px; align-items: center; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 6px; background: color-mix(in srgb, var(--background) 96%, var(--muted)); overflow-x: auto; }
+.tab-bar { display: flex; min-height: 30px; align-items: center; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 var(--space-3); background: color-mix(in srgb, var(--background) 96%, var(--muted)); overflow-x: auto; }
 .tab-bar button { display: inline-flex; height: 26px; flex: 0 0 auto; align-items: center; gap: 5px; border: 0; border-radius: 4px; padding: 0 9px; background: transparent; color: var(--muted-foreground); font-size: 12px; cursor: pointer; }
 .tab-bar button:hover { background: var(--accent); color: var(--foreground); }
 .tab-bar button.is-active { background: var(--accent); color: var(--accent-foreground); font-weight: 600; }
@@ -380,7 +406,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .tab-bar > .badge { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Kafka 表单（grid 字段 + compact 输入） */
-.kafka-form { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: flex-end; border-bottom: 1px solid var(--border); padding: 8px; }
+.kafka-form { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: flex-end; border-bottom: 1px solid var(--border); padding: var(--space-3); }
 /* 详情抽屉内嵌的本地二次解码表单：去外框贴紧排版（替代 inline style）。 */
 .kafka-form--bare { border-bottom: 0; padding: 0; }
 .kafka-form .field, .consume-groups .field { display: flex; min-width: 0; flex-direction: column; gap: 3px; font-size: 10px; color: var(--muted-foreground); }
@@ -462,7 +488,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .kv-table td.kv-table__value { font-family: var(--mono-font-family); }
 .kv-table .kv-table__action-col { width: 32px; }
 .value-view--headers { flex: 0 0 auto; max-height: 220px; }
-.detail-headers-empty { padding: 6px 0; }
+.detail-headers-empty { padding: var(--space-2) 0; }
 .value-view { min-height: 0; flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 8px; overflow: auto; background: var(--background); font-family: var(--mono-font-family); font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .value-view.error { color: var(--destructive); }
 .drawer-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -478,21 +504,23 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .kafka-table-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mono-s { font-family: var(--mono-font-family); font-size: 10.5px; }
 
-/* 徽章 */
+/* 徽章：文字在纯状态色之上时亮色主题不足 AA（success 3.3 / warning 3.2 / danger
+   4.8:1），向前景混 22% 压深/提亮到 ≥4.5:1；靠改文字色而非加彩底饱和度，
+   边框仍保留状态色识别。 */
 .badge { display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 0 6px; font-size: 10px; font-variant-numeric: tabular-nums; border: 1px solid var(--border); color: var(--muted-foreground); }
-.badge-warn { border-color: color-mix(in srgb, var(--warning) 55%, var(--border)); color: var(--warning); }
-.badge-danger { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); color: var(--destructive); }
-.badge-ok { border-color: color-mix(in srgb, var(--success) 55%, var(--border)); color: var(--success); }
+.badge-warn { border-color: color-mix(in srgb, var(--warning) 55%, var(--border)); color: color-mix(in srgb, var(--warning) 78%, var(--foreground)); }
+.badge-danger { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); color: color-mix(in srgb, var(--destructive) 78%, var(--foreground)); }
+.badge-ok { border-color: color-mix(in srgb, var(--success) 55%, var(--border)); color: color-mix(in srgb, var(--success) 78%, var(--foreground)); }
 .badge-internal { background: color-mix(in srgb, var(--muted-foreground) 20%, transparent); }
 
 /* 流式面板（消息列表已接 DbxAgGrid，此处仅剩状态行） */
 .stream-panel { flex: 1 1 0; min-height: 0; overflow-y: auto; }
 .stream-panel .grid-box--fill { min-height: 220px; }
-.stream-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 4px 8px; color: var(--muted-foreground); font-size: 11px; }
+.stream-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: var(--space-1) var(--space-4); color: var(--muted-foreground); font-size: 11px; }
 
 /* 通用小工具 */
 .inline-actions { display: inline-flex; align-items: center; gap: 4px; }
-.subpanel-title { margin: 0; padding: 8px 10px 2px; font-size: 12px; font-weight: 600; }
+.subpanel-title { margin: 0; padding: var(--space-3) var(--space-4) var(--space-1); font-size: 12px; font-weight: 600; }
 .section-block { display: flex; flex-direction: column; min-height: 0; }
 
 /* ag-grid 容器（Phase 2）：DbxAgGrid 需确定高度；fill 变体占满剩余空间 */
@@ -531,19 +559,24 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
   --ag-header-cell-hover-background-color: transparent;
   --ag-header-cell-moving-background-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
-/* 网格内部是唯一需要保留原生滚动条的工作区。全局工作台会隐藏滚动条，
-   若不在这里恢复，数据多于视口时只能靠滚轮摸索，尤其触控板/键盘用户
-   无法判断还有未见行。AG Grid 的 viewport 由主题运行时创建，故在这里
-   恢复细窄、与 DBX 令牌一致的滚动条。 */
+/* 网格内部与数据列表滚动区是仅有的保留原生滚动条的工作区。全局工作台会隐藏
+   滚动条，若不在这些容器恢复，数据多于视口时只能靠滚轮摸索，尤其触控板/键盘
+   用户无法判断还有未见行（.dbx-grid 例外既有同一理由，现统一到数据列表区：
+   树行/结果行/消息行/headers 表/连接设置体）。样式细窄、与 DBX 令牌一致。 */
 .dbx-grid,
-.dbx-grid * {
+.dbx-grid *,
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body) {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
 }
-.dbx-grid *::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
-.dbx-grid *::-webkit-scrollbar-track { background: transparent; }
-.dbx-grid *::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted-foreground) 55%, transparent); background-clip: padding-box; }
-.dbx-grid *::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground)); background-clip: padding-box; }
+.dbx-grid *::-webkit-scrollbar,
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
+.dbx-grid *::-webkit-scrollbar-track,
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-track { background: transparent; }
+.dbx-grid *::-webkit-scrollbar-thumb,
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted-foreground) 55%, transparent); background-clip: padding-box; }
+.dbx-grid *::-webkit-scrollbar-thumb:hover,
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground)); background-clip: padding-box; }
 /* 行内单元格/行级状态（健康列、Monitor 阈值告警行高亮） */
 .dbx-cell-ok { color: var(--success); }
 .dbx-cell-bad { color: var(--destructive); }
@@ -596,7 +629,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .field-error { margin: 0; color: var(--destructive); font-size: 10px; }
 
 /* 表单尾部固定 actions：主按钮右侧、大号主色 */
-.form-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-bottom: 1px solid var(--border); padding: 8px; }
+.form-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-bottom: 1px solid var(--border); padding: var(--space-3); }
 .form-footer .footer-spacer { flex: 1; }
 .form-footer .form-error { max-width: 70%; }
 .primary-button--lg { min-height: 30px; gap: 6px; padding: 4px 16px; font-size: 12px; font-weight: 600; }
@@ -626,7 +659,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 /* 单行消费条（条件抽屉化改造）：topic 下拉 + 条件开关 + 摘要 chips + 消费，
    常驻一行；条件全量收进下方浮层抽屉，表格吃满剩余高度。 */
-.consume-bar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: 6px 8px; }
+.consume-bar { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: var(--space-2) var(--space-3); }
 .consume-bar__topic { display: flex; min-width: 0; flex: 0 1 300px; align-items: center; gap: 6px; }
 .consume-bar__label { flex: 0 0 auto; font-size: 10px; color: var(--muted-foreground); }
 .consume-bar__topic select { min-width: 0; flex: 1; height: 26px; }
@@ -671,3 +704,14 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .tree-star:hover { color: var(--primary); }
 .tree-star.is-fav { color: var(--primary); }
 .tree-star.is-fav svg { fill: currentColor; }
+
+/* 系统要求减少动效时停用装饰性过渡/动画（hover 过渡、chev 旋转、加载转圈、
+   flow 呼吸点——含组件 scoped 层的同类声明），信息仍由文字与静态状态传达。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
