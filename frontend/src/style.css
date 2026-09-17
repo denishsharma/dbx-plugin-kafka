@@ -108,17 +108,16 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .icon-neutral { color: var(--muted-foreground); }
 /* 小尺寸图标（TopicTree 树行 / 过滤框等行内 13px 场景，替代 inline style）。 */
 .icon-13 { width: 13px; height: 13px; flex: 0 0 13px; }
-.icon-emerald { color: #10b981; }
-.icon-amber { color: #d97706; }
-.icon-cyan { color: #0891b2; }
-.icon-violet { color: #7c3aed; }
-.icon-blue { color: #2563eb; }
+.icon-emerald { color: light-dark(#10b981, #6ee7b7); }
+.icon-amber { color: light-dark(#d97706, #fcd34d); }
+.icon-cyan { color: light-dark(#0891b2, #67e8f9); }
+.icon-violet { color: light-dark(#7c3aed, #c4b5fd); }
+.icon-blue { color: light-dark(#2563eb, #93c5fd); }
 .icon-red { color: var(--destructive); }
-:root[data-theme="dark"] .icon-emerald, :root[data-dbx-theme="dark"] .icon-emerald { color: #6ee7b7; }
-:root[data-theme="dark"] .icon-amber, :root[data-dbx-theme="dark"] .icon-amber { color: #fcd34d; }
-:root[data-theme="dark"] .icon-cyan, :root[data-dbx-theme="dark"] .icon-cyan { color: #67e8f9; }
-:root[data-theme="dark"] .icon-violet, :root[data-dbx-theme="dark"] .icon-violet { color: #c4b5fd; }
-:root[data-theme="dark"] .icon-blue, :root[data-dbx-theme="dark"] .icon-blue { color: #93c5fd; }
+/* 语义色标（树行/状态图标）随 color-scheme 自动翻转：信号与 data-theme /
+   data-dbx-theme 属性、applyAppearance 的 inline color-scheme 同源；属性都
+   缺失时 :root 默认 dark 仍解析出暗色值，暗色宿主不再出现深色图标贴深底
+   （issue #25）。旧引擎不识别 light-dark() 时回落继承前景色，同样可读。 */
 
 .notice, .error-banner { position: absolute; z-index: 15; left: 50%; max-width: min(720px, calc(100% - 32px)); transform: translateX(-50%); gap: 10px; border-radius: var(--radius); box-shadow: 0 6px 24px rgb(0 0 0 / 24%); }
 .notice { position: fixed; bottom: 24px; z-index: 90; border: 0; border-radius: 8px; padding: 8px 16px; background: var(--foreground); color: var(--background); font-size: 14px; box-shadow: 0 10px 28px rgb(0 0 0 / 28%); }
@@ -157,7 +156,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 .tree-rows { min-height: 0; flex: 1; overflow: auto; padding: 4px 2px; }
 
 .tree-node { border: 0; width: 100%; background: transparent; }
-.tree-row { display: flex; width: 100%; min-height: 26px; align-items: center; gap: 4px; border: 0; border-radius: 4px; padding: 2px 6px; text-align: left; cursor: default; }
+.tree-row { display: flex; width: 100%; min-height: 26px; align-items: center; gap: 4px; border: 0; border-radius: 4px; padding: 2px 6px; text-align: left; cursor: default; color: var(--foreground); }
 .tree-row:hover { background: color-mix(in srgb, var(--accent) 65%, transparent); }
 /* 选中态：轻底 + 主色文字/图标高亮（不整行铺实底，避免与 hover 底色块混淆）。 */
 .tree-row.selected, .tree-row.selected:hover { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
@@ -667,7 +666,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: no
 
 /* Lane4 打磨：topic 收藏星标（默认弱对比，hover/已收藏实心高亮；
    tabindex=-1 不入 Tab 序，树键盘模型保持单 tab stop）。 */
-.tree-star { display: inline-flex; align-items: center; flex: 0 0 auto; border: 0; padding: 0; background: transparent; color: color-mix(in srgb, var(--muted-foreground) 55%, transparent); cursor: pointer; }
+.tree-star { display: inline-flex; align-items: center; flex: 0 0 auto; border: 0; padding: 0; background: transparent; color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); cursor: pointer; }
 .tree-star svg { width: 13px; height: 13px; }
 .tree-star:hover { color: var(--primary); }
 .tree-star.is-fav { color: var(--primary); }

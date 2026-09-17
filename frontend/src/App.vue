@@ -227,6 +227,23 @@ const toolbarStyle = computed(() => {
   return { backgroundColor: colorWithAlpha(color, light ? 0.05 : 0.1), boxShadow: `inset 0 1px 0 ${colorWithAlpha(color, light ? 0.12 : 0.18)}` };
 });
 
+// 颜色变量 → 宿主令牌名。宿主在插件根节点维护了令牌的字段交给 themeSync 桥
+// （var(--color-*) 动态跟随宿主令牌更新）；inline 写入会以更高优先级永久冻结
+// 桥的引用，宿主后续令牌翻转不再生效（issue #25：暗色宿主下左栏/表格文字
+// 停留在错误快照）。令牌缺失（Host API 1.0 / mock 缺省）才 inline 写规范色板，
+// 覆盖桥的暗色回退；以文档实际令牌探测为准，appearance 消息带色但无令牌的
+// 部分下发同样走 inline，不出现拼色。
+const APPEARANCE_COLOR_VARS = [
+  ["--background", "--color-background", "background"],
+  ["--foreground", "--color-foreground", "foreground"],
+  ["--muted", "--color-muted", "muted"],
+  ["--muted-foreground", "--color-muted-foreground", "mutedForeground"],
+  ["--accent", "--color-accent", "accent"],
+  ["--accent-foreground", "--color-accent-foreground", "accentForeground"],
+  ["--border", "--color-border", "border"],
+  ["--destructive", "--color-destructive", "destructive"],
+] as const;
+
 function applyAppearance(next?: DbxPluginAppearanceInput | null) {
   // 宿主可能缺字段（1.0 部分下发、1.1 theme 通道只带颜色令牌），按 DBX 规范色板补齐。
   const resolved = resolveAppearance(next);
@@ -234,14 +251,11 @@ function applyAppearance(next?: DbxPluginAppearanceInput | null) {
   const root = document.documentElement;
   root.dataset.theme = resolved.colorScheme;
   root.style.colorScheme = resolved.colorScheme;
-  root.style.setProperty("--background", resolved.colors.background);
-  root.style.setProperty("--foreground", resolved.colors.foreground);
-  root.style.setProperty("--muted", resolved.colors.muted);
-  root.style.setProperty("--muted-foreground", resolved.colors.mutedForeground);
-  root.style.setProperty("--accent", resolved.colors.accent);
-  root.style.setProperty("--accent-foreground", resolved.colors.accentForeground);
-  root.style.setProperty("--border", resolved.colors.border);
-  root.style.setProperty("--destructive", resolved.colors.destructive);
+  const tokens = getComputedStyle(root);
+  for (const [name, token, key] of APPEARANCE_COLOR_VARS) {
+    if (tokens.getPropertyValue(token).trim()) root.style.removeProperty(name);
+    else root.style.setProperty(name, resolved.colors[key]);
+  }
   root.style.setProperty("--popover", DBX_POPOVER[resolved.colorScheme]);
   root.style.setProperty("--ui-font-family", resolved.ui.fontFamily);
 }
