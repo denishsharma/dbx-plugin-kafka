@@ -13,3 +13,4 @@ node_modules/
 !/ui/.gitkeep
 .dbx-repository-signing-key.env
 .idea/
+.mimosa/
