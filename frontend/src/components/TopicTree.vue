@@ -7,7 +7,7 @@
 // （180–480px，localStorage 记忆，双击重置）、折叠成 40px 竖条（折叠时不渲染
 // 树内容），过滤框 / 快捷键聚焦 + 匹配/总数徽章。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { ChevronsLeft, ChevronsRight, Eye, EyeOff, HardDrive, RefreshCw, Search, Star, X } from "@lucide/vue";
+import { ChevronsLeft, ChevronsRight, Eye, EyeOff, HardDrive, Play, RefreshCw, Search, Send, Star, X } from "@lucide/vue";
 import type { KafkaTopic } from "../lib/api";
 import { filterTopics, sortTopicsPinned } from "../lib/topics";
 import { isFavoriteTopic, toggleTopicFavorite, topicFavorites } from "../lib/topicFavorites";
@@ -24,6 +24,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "refresh"): void;
   (e: "select", topic: string): void;
+  // 对齐 Confluent IDE 树快捷动作：行内「打开生产 / 打开消费」，选中与面板
+  // 切换由父级（App）统一接线（selectTopic + openPanel 单一来源）。
+  (e: "openProduce", topic: string): void;
+  (e: "openConsume", topic: string): void;
 }>();
 
 // -- 侧栏宽度 / 折叠（localStorage 记忆，宿主 webview 禁存储时静默降级）---------
@@ -347,6 +351,31 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown));
             >
               <Star aria-hidden="true" />
             </span>
+            <!-- 对齐 Confluent IDE 树快捷动作：行内「打开生产 / 打开消费」小图标
+                 （span role=button + tabindex=-1：树保持单 tab stop 键盘模型；
+                 @click.stop 防止触发行选中；Send=生产 / Play=消费与消息面板同款） -->
+            <span
+              class="tree-quick"
+              role="button"
+              tabindex="-1"
+              :title="t('tree.openProduce')"
+              :aria-label="t('tree.openProduce')"
+              :data-testid="`produce-${topic.name}`"
+              @click.stop="emit('openProduce', topic.name)"
+            >
+              <Send aria-hidden="true" />
+            </span>
+            <span
+              class="tree-quick"
+              role="button"
+              tabindex="-1"
+              :title="t('tree.openConsume')"
+              :aria-label="t('tree.openConsume')"
+              :data-testid="`consume-${topic.name}`"
+              @click.stop="emit('openConsume', topic.name)"
+            >
+              <Play aria-hidden="true" />
+            </span>
             <!-- F6-5：不健康红点（title = N 个分区不健康），无额外请求 -->
             <span
               v-if="unhealthyCount(topic) > 0"
@@ -373,3 +402,25 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onGlobalKeydown));
     </template>
   </aside>
 </template>
+
+<style scoped>
+/* 行内快捷动作（打开生产/消费）：与全局 .tree-star 同规格的小图标钮；
+   样式收敛在组件内（不动全局 style.css）。 */
+.tree-quick {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  cursor: pointer;
+}
+.tree-quick svg {
+  width: 13px;
+  height: 13px;
+}
+.tree-quick:hover {
+  color: var(--primary);
+}
+</style>

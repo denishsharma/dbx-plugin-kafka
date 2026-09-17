@@ -304,3 +304,75 @@ describe("ProducePanel partition guard (F6-4)", () => {
     expect(invokeMock.mock.calls.filter(([method]) => method === "kafka/messages/produce")).toHaveLength(1);
   });
 });
+
+describe("ProducePanel sent history (Confluent Data alignment)", () => {
+  it("appends a row with key/partition/offset and the ok marker after a successful send", async () => {
+    installBridge((method) => {
+      if (method !== "kafka/messages/produce") return {};
+      return { partition: 2, offset: 41 };
+    });
+    const wrapper = mountPanel();
+    await flushPromises();
+    // 发送前历史区为空态。
+    expect(wrapper.find('[data-testid="sent-history"] .empty').exists()).toBe(true);
+    await wrapper.find(".produce-row input").setValue("k1");
+    await wrapper.find(".produce-value-editor textarea, .code-editor-stub").setValue("v1");
+    await wrapper.find(".produce-actions .produce-send-button").trigger("click");
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="history-row"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain("k1");
+    expect(rows[0].text()).toContain("v1");
+    expect(rows[0].text()).toContain("P2");
+    expect(rows[0].text()).toContain("#41");
+    expect(rows[0].find('[data-testid="history-status"]').classes()).toContain("badge-ok");
+  });
+
+  it("records failed sends with the error marker and the error summary", async () => {
+    installBridge((method) => {
+      if (method !== "kafka/messages/produce") return {};
+      throw new Error("broker gone");
+    });
+    const wrapper = mountPanel();
+    await flushPromises();
+    await wrapper.find(".produce-value-editor textarea, .code-editor-stub").setValue("v1");
+    await wrapper.find(".produce-actions .produce-send-button").trigger("click");
+    await flushPromises();
+
+    const rows = wrapper.findAll('[data-testid="history-row"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].find('[data-testid="history-status"]').classes()).toContain("badge-danger");
+    expect(rows[0].text()).toContain(t("produce.historyError"));
+    // 失败行无 partition/offset（占位 —），并带错误摘要。
+    expect(rows[0].text()).toContain("—");
+    expect(rows[0].text()).toContain("broker gone");
+  });
+
+  it("records flow ticks and trims the history to the 50-entry cap", async () => {
+    let calls = 0;
+    installBridge((method) => {
+      if (method !== "kafka/messages/produce") return {};
+      calls += 1;
+      return { partition: 0, offset: calls - 1 };
+    });
+    const wrapper = mountPanel();
+    await flushPromises();
+    await wrapper.find('[data-testid="flow-toggle"]').setValue(true);
+    await wrapper.find('[data-testid="flow-group"] select').setValue("template");
+    await wrapper.findAll(".code-editor-stub")[2].setValue('{"n":1}');
+    // countPerSend=5 + 条数上限 55：11 个 tick 发满后自动停止。
+    await wrapper.find('[data-testid="flow-max-records"]').setValue("55");
+    await wrapper.findAll('[data-testid="flow-group"] input[type="number"]')[0].setValue("5");
+    await startFlow(wrapper);
+    await vi.advanceTimersByTimeAsync(11000);
+    await flushPromises();
+
+    expect(calls).toBe(55);
+    const rows = wrapper.findAll('[data-testid="history-row"]');
+    // 上限裁剪：只保留最新 50 条（offset 5..54），最旧的 5 条被丢弃。
+    expect(rows).toHaveLength(50);
+    expect(rows[0].text()).toContain("#5");
+    expect(rows[rows.length - 1].text()).toContain("#54");
+  });
+});

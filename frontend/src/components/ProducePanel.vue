@@ -17,7 +17,7 @@
 // franz-go 能力对齐（acks=0 不做：同步 ProduceSync 依赖 broker 响应）；
 // 仅在偏离默认时随请求携带（acks!=="all" / enableIdempotence=false）。
 // Phase 3 F6-4：头部显示所选 topic 分区数，partition 超界行内校验。
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { CircleCheck, Play, Send, Square } from "@lucide/vue";
 import CodeEditor from "./CodeEditor.vue";
 import { kafkaApi, type Compression, type ProduceAcks, type ProduceResult, type SchemaAttach, type SchemaFormat, type SchemaSubject } from "../lib/api";
@@ -31,7 +31,8 @@ import {
 } from "../lib/flowRandom";
 import { isInternalTopicName } from "../lib/topics";
 import { parseHeadersJson } from "../lib/jsonText";
-import { partitionInputIssue } from "../lib/uiHelpers";
+import { partitionInputIssue, previewText } from "../lib/uiHelpers";
+import { formatTimestamp, timestampIso } from "../lib/timestamps";
 import { t } from "../lib/i18n";
 
 const props = defineProps<{
@@ -61,6 +62,48 @@ const idempotence = ref(true);
 const sending = ref(false);
 const lastResult = ref<ProduceResult | null>(null);
 const localError = ref("");
+
+// -- 会话发送历史（对齐 Confluent IDE 插件 Producer 的 Data 区）---------------------
+// 手动发送与 Flow tick 的每一条 produce 都落一行（成功/失败均记录）：key/value
+// 截断预览 + partition/offset + 时间 + 成败标记（失败附错误摘要）。只保留最近
+// SENT_HISTORY_MAX 条（超出丢最旧，防长会话 OOM）；状态随组件卸载即弃，不持久化。
+const SENT_HISTORY_MAX = 50;
+const KEY_PREVIEW_MAX = 24;
+const VALUE_PREVIEW_MAX = 60;
+const ERROR_PREVIEW_MAX = 80;
+
+interface SentHistoryEntry {
+  seq: number;
+  ok: boolean;
+  keyPreview: string;
+  valuePreview: string;
+  partition?: number;
+  offset?: number;
+  at: number;
+  error?: string;
+}
+
+const sentHistory = ref<SentHistoryEntry[]>([]);
+let sentSeq = 0;
+const historyEl = ref<HTMLElement | null>(null);
+
+/** 追加一条发送记录（超上限丢最旧），并把历史区滚动到最新行。 */
+function recordSent(entry: Omit<SentHistoryEntry, "seq" | "at">) {
+  sentHistory.value.push({ ...entry, seq: (sentSeq += 1), at: Date.now() });
+  if (sentHistory.value.length > SENT_HISTORY_MAX) sentHistory.value.shift();
+  void nextTick(() => {
+    const el = historyEl.value;
+    if (el) el.scrollTop = el.scrollHeight;
+  });
+}
+
+/** 由表单当前 key/value 生成历史行预览（Flow 行的 value 以实参为准）。 */
+function historyPreviews(keyText: string, valueText: string) {
+  return {
+    keyPreview: previewText(keyText, KEY_PREVIEW_MAX),
+    valuePreview: previewText(valueText, VALUE_PREVIEW_MAX),
+  };
+}
 
 const topicInternal = computed(() => isInternalTopicName(props.topic));
 
@@ -184,7 +227,7 @@ async function send() {
   sending.value = true;
   try {
     const schema = buildSchemaAttach();
-    lastResult.value = await kafkaApi.messagesProduce({
+    const result = await kafkaApi.messagesProduce({
       topic: props.topic,
       ...(key.value
         ? keyIsBase64.value
@@ -200,12 +243,16 @@ async function send() {
       ...(!idempotence.value ? { enableIdempotence: false } : {}),
       ...(schema ? { schema } : {}),
     });
+    lastResult.value = result;
+    recordSent({ ok: true, ...historyPreviews(key.value, value.value), partition: result.partition, offset: result.offset });
     emit(
       "notify",
       `${t("produce.sent")} · ${t("produce.sentTo", { partition: lastResult.value.partition, offset: lastResult.value.offset })}`,
     );
   } catch (cause) {
-    emit("error", cause instanceof Error ? cause.message : String(cause));
+    const message = cause instanceof Error ? cause.message : String(cause);
+    recordSent({ ok: false, ...historyPreviews(key.value, value.value), error: message });
+    emit("error", message);
   } finally {
     sending.value = false;
   }
@@ -372,7 +419,7 @@ async function runFlowTick(schemaText: string | null, schemaAttach?: SchemaAttac
       return;
     }
     try {
-      await kafkaApi.messagesProduce({
+      const result = await kafkaApi.messagesProduce({
         topic: props.topic,
         value,
         ...(key.value ? { key: key.value } : {}),
@@ -386,6 +433,8 @@ async function runFlowTick(schemaText: string | null, schemaAttach?: SchemaAttac
       flowSent.value += 1;
       flowFailures = 0;
       flowLastValue.value = value.length > 200 ? `${value.slice(0, 200)}…` : value;
+      // 会话历史逐条落行（对齐 Confluent IDE Data 区）。
+      recordSent({ ok: true, ...historyPreviews(key.value, value), partition: result.partition, offset: result.offset });
       // 停止条件：总条数 / 总时长（任一命中即停，条数优先）。
       if (flowMaxRecords.value > 0 && flowSent.value >= flowMaxRecords.value) {
         stopFlow("records");
@@ -397,7 +446,9 @@ async function runFlowTick(schemaText: string | null, schemaAttach?: SchemaAttac
       }
     } catch (cause) {
       flowFailures += 1;
-      emit("error", cause instanceof Error ? cause.message : String(cause));
+      const message = cause instanceof Error ? cause.message : String(cause);
+      recordSent({ ok: false, ...historyPreviews(key.value, value), error: message });
+      emit("error", message);
       // 发送连续失败 ≥3 → 自动停止（read_only 由 canWrite watcher 兜底）。
       if (flowFailures >= 3) {
         stopFlow("failures");
@@ -675,6 +726,37 @@ onBeforeUnmount(() => stopFlow());
           {{ sendCount > 1 ? t("produce.sendCount", { count: sendCount }) : t("produce.send") }}
         </button>
       </div>
+
+      <!-- 会话发送历史（对齐 Confluent IDE Producer 的 Data 区）：手动与 Flow 的
+           每一条 produce 都落行，最新在底部并自动滚动；仅保留最近 50 条。 -->
+      <div class="produce-history" data-testid="sent-history">
+        <div class="produce-editor-head">
+          <span>{{ t("produce.historyTitle") }}</span>
+          <span v-if="sentHistory.length > 0" class="badge">{{ t("produce.historyRecent", { count: SENT_HISTORY_MAX }) }}</span>
+        </div>
+        <div v-if="sentHistory.length === 0" class="empty compact">{{ t("produce.historyEmpty") }}</div>
+        <div v-else ref="historyEl" class="produce-history-rows">
+          <div
+            v-for="entry in sentHistory"
+            :key="entry.seq"
+            class="produce-history-row"
+            data-testid="history-row"
+            :title="entry.error ?? entry.valuePreview"
+          >
+            <span class="badge" :class="entry.ok ? 'badge-ok' : 'badge-danger'" data-testid="history-status">
+              {{ entry.ok ? t("produce.historyOk") : t("produce.historyError") }}
+            </span>
+            <span class="mono-s produce-history-key" :title="entry.keyPreview">{{ entry.keyPreview || "—" }}</span>
+            <span class="mono-s produce-history-value">{{ entry.valuePreview }}</span>
+            <span v-if="!entry.ok" class="form-error produce-history-err" :title="entry.error">
+              {{ previewText(entry.error, ERROR_PREVIEW_MAX) }}
+            </span>
+            <span class="mono-s produce-history-part" :title="t('produce.partition')">P{{ entry.partition ?? "—" }}</span>
+            <span class="mono-s produce-history-offset">#{{ entry.offset ?? "—" }}</span>
+            <span class="mono-s produce-history-time" :title="timestampIso(entry.at)">{{ formatTimestamp(entry.at) }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -867,5 +949,55 @@ onBeforeUnmount(() => stopFlow());
 }
 .produce-flow-last {
   overflow-wrap: anywhere;
+}
+/* 会话发送历史（对齐 Confluent IDE Data 区）：紧凑单行列表，最新在底部自动
+   滚动；全局类只补 flex/截断等最小布局（不依赖 style.css 改动）。 */
+.produce-history {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.produce-history-rows {
+  display: flex;
+  max-height: 168px;
+  min-height: 0;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+}
+.produce-history-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.produce-history-key,
+.produce-history-value,
+.produce-history-err {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.produce-history-key {
+  flex: 0 0 110px;
+}
+.produce-history-value {
+  flex: 1 1 auto;
+}
+.produce-history-err {
+  flex: 0 1 240px;
+  white-space: nowrap;
+}
+.produce-history-part,
+.produce-history-offset,
+.produce-history-time {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
 }
 </style>
