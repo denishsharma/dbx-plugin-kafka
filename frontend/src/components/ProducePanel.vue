@@ -411,7 +411,15 @@ async function runFlowTick(schemaText: string | null, schemaAttach?: SchemaAttac
 async function startFlow() {
   if (flowRunning.value || flowDisabled.value) return;
   emit("error", "");
-  const preflight = await preflightFlow();
+  let preflight: Awaited<ReturnType<typeof preflightFlow>>;
+  try {
+    preflight = await preflightFlow();
+  } catch (cause) {
+    // SR 请求失败（subjects/list、schema/get）此前一路 reject 成未捕获异常：
+    // 点击「开始」后无任何反馈。走统一错误横幅（与 runFlowTick 同一口径）。
+    emit("error", cause instanceof Error ? cause.message : String(cause));
+    return;
+  }
   if (preflight === null) return;
   flowSent.value = 0;
   flowLastValue.value = "";

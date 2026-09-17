@@ -90,6 +90,9 @@ async function loadGroups() {
 }
 
 async function sample() {
+  // 重入守卫：上一轮请求未返回时跳过本 tick，防止慢响应乱序覆盖
+  // lagRows/history（趋势曲线乱序）。
+  if (samplingBusy.value) return;
   if (!group.value) {
     emit("notify", t("monitor.needGroup"));
     return;

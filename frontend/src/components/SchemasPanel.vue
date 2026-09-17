@@ -255,6 +255,8 @@ async function loadSubjects() {
 async function loadCompat(subject: string | undefined) {
   try {
     const response = await kafkaApi.schemaCompatibilityGet(subject, registry.value);
+    // 竞态守卫：await 期间已切换 subject 时丢弃旧响应。
+    if (subject !== selectedSubject.value) return;
     compatLevel.value = response.level ?? "";
     compatScope.value = response.scope ?? "";
     compatChoice.value = (response.level as SchemaCompatibilityLevel) || "BACKWARD";
@@ -263,7 +265,13 @@ async function loadCompat(subject: string | undefined) {
   }
 }
 
+// 请求序号守卫：快速连选 subject / 连点版本时，慢到的旧响应不得覆盖新状态
+// （版本表/详情与 selectedSubject、selectedVersion 保持一致）。
+let subjectSeq = 0;
+let versionSeq = 0;
+
 async function selectSubject(row: SubjectVm | null) {
+  const seq = ++subjectSeq;
   selectedSubject.value = row?.subject ?? "";
   versions.value = [];
   selectedVersion.value = null;
@@ -274,6 +282,7 @@ async function selectSubject(row: SubjectVm | null) {
   emit("error", "");
   try {
     const response = await kafkaApi.schemaVersionsList(selectedSubject.value, registry.value);
+    if (seq !== subjectSeq) return;
     versions.value = response.versions ?? [];
     if (versions.value.length > 0) {
       const latest = versions.value[versions.value.length - 1].version;
@@ -283,23 +292,29 @@ async function selectSubject(row: SubjectVm | null) {
     }
     await loadCompat(selectedSubject.value);
   } catch (cause) {
+    if (seq !== subjectSeq) return; // 旧请求的报错不打扰新选中 subject
     emit("error", cause instanceof Error ? cause.message : String(cause));
   } finally {
-    busy.value = false;
+    // 仅最新请求复位 busy，避免旧请求抢先解锁新在途加载。
+    if (seq === subjectSeq) busy.value = false;
   }
 }
 
 async function viewVersion(version: number) {
   if (!selectedSubject.value) return;
+  const seq = ++versionSeq;
   busy.value = true;
   emit("error", "");
   try {
-    detail.value = await kafkaApi.schemaGet(selectedSubject.value, version, registry.value);
+    const next = await kafkaApi.schemaGet(selectedSubject.value, version, registry.value);
+    if (seq !== versionSeq) return;
+    detail.value = next;
     selectedVersion.value = version;
   } catch (cause) {
+    if (seq !== versionSeq) return;
     emit("error", cause instanceof Error ? cause.message : String(cause));
   } finally {
-    busy.value = false;
+    if (seq === versionSeq) busy.value = false;
   }
 }
 

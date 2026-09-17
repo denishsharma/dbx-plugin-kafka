@@ -170,11 +170,14 @@ function stateDotClass(state: string): string {
   return "idle";
 }
 
+// Intl.DateTimeFormat 构造昂贵：缓存实例（此前每行每次渲染都新建一个）。
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "medium" });
+
 function formatTime(value?: number | string): string {
   if (value === undefined || value === null || value === "") return "";
   const parsed = typeof value === "number" ? value : Date.parse(value);
   if (!Number.isFinite(parsed)) return String(value);
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "medium" }).format(new Date(parsed));
+  return dateTimeFormatter.format(new Date(parsed));
 }
 
 function openAssistant() {

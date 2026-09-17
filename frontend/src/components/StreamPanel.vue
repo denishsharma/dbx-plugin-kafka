@@ -227,19 +227,27 @@ async function loadNewer() {
   await pageHistory(1);
 }
 
+// 请求序号守卫：快速连点「更早/更新」时旧响应乱序落地会回滚窗口；会话已停止
+// （sessionId 变化）后旧响应同样丢弃。
+let pageSeq = 0;
+
 async function pageHistory(direction: number) {
   if (!sessionId.value) return;
+  const seq = ++pageSeq;
+  const requestSessionId = sessionId.value;
   try {
     const pageSize = positiveInt(limit.value, 100);
     const maxStart = Math.max(0, bufferSize.value - pageSize);
     historyOffset.value = Math.min(maxStart, Math.max(0, historyOffset.value + direction * pageSize));
-    const response = await kafkaApi.streamMessages(sessionId.value, historyOffset.value, pageSize);
+    const response = await kafkaApi.streamMessages(requestSessionId, historyOffset.value, pageSize);
+    if (seq !== pageSeq || sessionId.value !== requestSessionId) return;
     if (Array.isArray(response.messages)) {
       rows.value = response.messages.slice(-MAX_ROWS);
       droppedRows.value = Math.max(0, bufferSize.value - historyOffset.value - rows.value.length);
       rebuildMessageRows();
     }
   } catch (cause) {
+    if (seq !== pageSeq || sessionId.value !== requestSessionId) return;
     emit("error", cause instanceof Error ? cause.message : String(cause));
   }
 }

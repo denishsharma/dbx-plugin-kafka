@@ -529,7 +529,7 @@ export function topicOffsetColumns(): ColDef<TopicOffsetVm>[] {
     numberColumn("partition", "topics.colPartition", { maxWidth: 90 }),
     numberColumn("offset", "messages.colOffset", { maxWidth: 130 }),
     timestampColumn("messages.colTimestamp", { minWidth: 150 }),
-    textColumn("leaderEpoch", "Epoch", { maxWidth: 90, cellClass: "mono-s", headerName: "Epoch" }),
+    textColumn("leaderEpoch", "topics.colEpoch", { maxWidth: 90, cellClass: "mono-s" }),
   ];
 }
 

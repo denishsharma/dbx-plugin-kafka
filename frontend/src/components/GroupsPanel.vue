@@ -106,20 +106,28 @@ function selectGroup(row: GroupRow | null) {
   void loadGroupDetail(group);
 }
 
+// 请求序号守卫：快速切换组时，慢到的旧组响应不得覆盖新选中组的状态。
+let detailSeq = 0;
+
 async function loadGroupDetail(group: KafkaGroup) {
+  const seq = ++detailSeq;
   busy.value = true;
   emit("error", "");
   try {
     const offsets = await kafkaApi.groupsOffsetsList(group.group);
+    if (seq !== detailSeq) return;
     offsetRows.value = offsets.rows ?? [];
     totalLag.value = typeof offsets.totalLag === "number" ? offsets.totalLag : sumLag(offsetRows.value);
     hasCommitted.value = offsetRows.value.some((row) => row.hasCommitted !== false);
     const described = await kafkaApi.groupsDescribe(group.group);
+    if (seq !== detailSeq) return;
     members.value = described.members ?? [];
   } catch (cause) {
+    if (seq !== detailSeq) return; // 旧请求的报错不打扰新选中组
     emit("error", cause instanceof Error ? cause.message : String(cause));
   } finally {
-    busy.value = false;
+    // 仅最新请求复位 busy，避免旧请求抢先解锁新在途加载。
+    if (seq === detailSeq) busy.value = false;
   }
 }
 

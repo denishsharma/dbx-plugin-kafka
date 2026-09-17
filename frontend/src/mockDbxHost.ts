@@ -662,7 +662,9 @@ function scanTopic(topic: MockTopic, input: Record<string, unknown>): { messages
     if (strategy === "offset" && partitionOffsets[partition] !== undefined) startIndex = partitionOffsets[partition];
     else if (strategy === "earliest") startIndex = 0;
     else if (strategy === "committed") {
-      const committed = orderGroup.committed.get(topic.name)?.get(partition);
+      // 按请求的 groupId 取对应组的 committed（此前硬编码 orderGroup，
+      // 其余组在 committed 策略下语义错误——回落 earliest）。
+      const committed = groups.get(String(input.groupId ?? ""))?.committed.get(topic.name)?.get(partition);
       startIndex = committed === undefined ? 0 : committed;
     } else if (strategy === "timestamp") {
       const after = typeof input.offsetTime === "number" ? input.offsetTime : Date.parse(String(input.offsetTime ?? "")) || 0;
@@ -676,6 +678,25 @@ function scanTopic(topic: MockTopic, input: Record<string, unknown>): { messages
   });
   const matched = scannedAll.filter((entry) => messageMatches(entry.message, input)).map((entry) => entry.message);
   return { messages: matched.slice(0, limit), scanned };
+}
+
+// mock 预设存取（localStorage 损坏/禁存储时静默兜底，与其他 lib 的
+// best-effort 存取范式一致）。
+function readMockPresets(): Array<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("kafka-mock-presets") ?? "[]");
+    return Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMockPresets(presets: Array<Record<string, unknown>>): void {
+  try {
+    localStorage.setItem("kafka-mock-presets", JSON.stringify(presets));
+  } catch {
+    /* 存储不可用：内存态即可 */
+  }
 }
 
 // -- request / invoke ---------------------------------------------------------------
@@ -976,19 +997,19 @@ const invoke: DbxPluginApi["invoke"] = async <T = unknown>(method: string, rawPa
     const limit = Number(input.limit ?? 100) || 100;
     result = { messages: session.buffer.slice(offset, offset + limit), total: session.buffer.length };
   } else if (method === "kafka/presets/list") {
-    result = { presets: JSON.parse(localStorage.getItem("kafka-mock-presets") ?? "[]") };
+    result = { presets: readMockPresets() };
   } else if (method === "kafka/presets/save") {
-    const presets = JSON.parse(localStorage.getItem("kafka-mock-presets") ?? "[]") as unknown[];
+    const presets = readMockPresets();
     const incoming = (input.preset ?? {}) as Record<string, unknown>;
     const index = presets.findIndex((preset) => (preset as Record<string, unknown>).id === incoming.id);
     if (index >= 0) presets[index] = incoming;
     else presets.push(incoming);
-    localStorage.setItem("kafka-mock-presets", JSON.stringify(presets));
+    writeMockPresets(presets);
     result = { presets };
   } else if (method === "kafka/presets/remove") {
     const id = String(input.id ?? "");
-    const presets = (JSON.parse(localStorage.getItem("kafka-mock-presets") ?? "[]") as Array<Record<string, unknown>>).filter((preset) => preset.id !== id);
-    localStorage.setItem("kafka-mock-presets", JSON.stringify(presets));
+    const presets = readMockPresets().filter((preset) => preset.id !== id);
+    writeMockPresets(presets);
     result = { presets };
   } else if (method === "kafka/connections/statuses") {
     result = {
