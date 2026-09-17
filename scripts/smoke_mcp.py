@@ -1204,9 +1204,9 @@ def k19_enum_online(client: SidecarClient) -> str:
         strategy_error = expect_error(
             lambda: call_tool(client, "kafka_messages_digest", connectionId=conn_id,
                               topic=topic, offsetStrategy="bogus"),
-            ("offsetstrategy must be latest, earliest, committed, timestamp, or offset",),
+            ("offsetstrategy must be latest, recent, earliest, committed, timestamp, or offset",),
         )
-        for option in ("latest", "earliest", "committed", "timestamp", "offset"):
+        for option in ("latest", "recent", "earliest", "committed", "timestamp", "offset"):
             assert option in str(strategy_error), (option, strategy_error)
 
         # resetTo="bogus"：报错列出 schema enum 全部合法值（带实际值）。
