@@ -9,12 +9,30 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, type PropType } from "vue";
 import TopicsPanel from "./TopicsPanel.vue";
 import { setKafkaConnectionId, type KafkaTopic } from "../lib/api";
-import { setTopicFavorites } from "../lib/topicFavorites";
+import { setTopicFavorites, toggleTopicFavorite } from "../lib/topicFavorites";
+import { toTopicRows } from "../lib/kafkaColumns";
 import { t } from "../lib/i18n";
 
 // -- DbxAgGrid 轻量 stub（镜像真实桥形状，见 GroupsPanel.spec 同款） -----------------
 // Lane4：额外透出 columnDefs 的列数/首个 colId（收藏星标列断言用）与行 name 文本
 // （收藏置顶排序断言用）。
+// perf(topics)：再透出 data-cref（columnDefs 数组引用代号，WeakMap 按对象身份
+// 分配——镜像 DbxAgGrid auto id 的写法）与 data-row-id（行对象 id 字段），分别
+// 断言「收藏切换不重建 columnDefs」与「行 id 稳定」。
+const colDefRefIds = new WeakMap<object, number>();
+let colDefRefSeq = 0;
+
+function colDefRefId(defs: unknown): string {
+  if (!defs || typeof defs !== "object") return "";
+  let id = colDefRefIds.get(defs);
+  if (id === undefined) {
+    id = colDefRefSeq;
+    colDefRefSeq += 1;
+    colDefRefIds.set(defs, id);
+  }
+  return String(id);
+}
+
 const DbxAgGridStub = defineComponent({
   name: "DbxAgGridStub",
   props: {
@@ -34,6 +52,7 @@ const DbxAgGridStub = defineComponent({
           "data-key": props.tableKey,
           "data-cols": String(props.columnDefs.length),
           "data-first-col": String(props.columnDefs[0]?.colId ?? ""),
+          "data-cref": colDefRefId(props.columnDefs),
         },
         (props.rowData ?? []).map((row, index) =>
           h(
@@ -41,6 +60,7 @@ const DbxAgGridStub = defineComponent({
             {
               type: "button",
               class: "grid-stub-row",
+              "data-row-id": String((row as { id?: unknown }).id ?? ""),
               onClick: () => {
                 if (props.rowSelection) emit("selection-changed", row);
                 if (props.emitRowClick) emit("row-click", row);
@@ -410,5 +430,66 @@ describe("TopicsPanel favorites (Lane4)", () => {
     setTopicFavorites([]);
     await flushPromises();
     expect(names()).toEqual(["order-events", "users", "_schemas"]);
+  });
+});
+
+// -- perf(topics)：收藏切换走增量更新，不再整表重建 ----------------------------
+// 修复前：topicGridCols 读收藏集 → 每次点星重建 columnDefs（setGridOption 全列
+// 刷新）；且行对象无稳定 id → ag-grid 按 WeakMap 对象身份分配 auto-* id，置顶
+// 重排的新对象被视为整表换行（大表 500+ topic 一次点击 = 全量重渲）。
+
+describe("TopicsPanel favorites incremental update (perf-topics)", () => {
+  const multi: KafkaTopic[] = [
+    { name: "_schemas", partitionCount: 1, replicationFactor: 1, isInternal: true },
+    { name: "users", partitionCount: 3, replicationFactor: 1 },
+    { name: "order-events", partitionCount: 2, replicationFactor: 1 },
+  ];
+
+  beforeEach(() => {
+    localStorage.clear();
+    setTopicFavorites([]);
+  });
+
+  it("keeps the columnDefs reference stable while favorites toggle and repin rows", async () => {
+    const wrapper = mountPanel({ topics: multi });
+    await flushPromises();
+    const grid = () => wrapper.find('.grid-stub[data-key="topics"]');
+    const names = () => wrapper.findAll('.grid-stub[data-key="topics"] .grid-stub-row').map((row) => row.text());
+    expect(names()).toEqual(["order-events", "users", "_schemas"]);
+    const crefBefore = grid().attributes("data-cref");
+    expect(crefBefore).toBeDefined();
+
+    // toggleTopicFavorite 是星标列 onToggleFavorite 的同一入口：切换收藏后
+    // columnDefs 引用不变（不触发 DbxAgGrid 的 columnDefs watch → 全列刷新），
+    // 而置顶顺序照常生效。
+    toggleTopicFavorite("users");
+    await flushPromises();
+    expect(grid().attributes("data-cref")).toBe(crefBefore);
+    expect(names()).toEqual(["users", "order-events", "_schemas"]);
+
+    toggleTopicFavorite("users");
+    await flushPromises();
+    expect(grid().attributes("data-cref")).toBe(crefBefore);
+    expect(names()).toEqual(["order-events", "users", "_schemas"]);
+  });
+
+  it("gives TopicVm a stable id so same-name topics keep their row identity", async () => {
+    // 纯函数层：同名 topic 前后两次 toTopicRows 的 id 相同（= topic name），
+    // 与传入顺序无关。
+    const first = toTopicRows(multi);
+    const second = toTopicRows([...multi].reverse());
+    expect(first.map((row) => row.id)).toEqual(["_schemas", "users", "order-events"]);
+    expect(second.map((row) => row.id)).toEqual(["order-events", "users", "_schemas"]);
+    expect(new Set(first.map((row) => row.id))).toEqual(new Set(second.map((row) => row.id)));
+
+    // 组件层：id 透传到网格（DbxAgGrid.resolveRowId 优先取行对象 id 字段）；
+    // props.topics 整体替换（刷新场景的新对象）后同名行 id 保持稳定。
+    const wrapper = mountPanel({ topics: multi });
+    await flushPromises();
+    const rowIds = () => wrapper.findAll('.grid-stub[data-key="topics"] .grid-stub-row').map((row) => row.attributes("data-row-id"));
+    expect(rowIds()).toEqual(["order-events", "users", "_schemas"]);
+    await wrapper.setProps({ topics: multi.map((topic) => ({ ...topic })) });
+    await flushPromises();
+    expect(rowIds()).toEqual(["order-events", "users", "_schemas"]);
   });
 });

@@ -119,6 +119,10 @@ export interface AclVm {
 }
 
 export interface TopicVm {
+  /** 稳定行身份 = topic name（perf-topics）：DbxAgGrid.resolveRowId 优先取行
+   *  对象的 id 字段，收藏置顶重排后行节点按 id 复用（immutable 增量更新），
+   *  不再整表换行。可选是为了兼容旧的手工构造字面量；toTopicRows 始终填充。 */
+  id?: string;
   name: string;
   partitionCount: number;
   replicationFactor: number;
@@ -238,6 +242,7 @@ export function toAclRows(acls: KafkaAcl[]): AclVm[] {
 
 export function toTopicRows(topics: KafkaTopic[]): TopicVm[] {
   return topics.map((topic) => ({
+    id: topic.name,
     name: topic.name,
     partitionCount: topic.partitionCount,
     replicationFactor: topic.replicationFactor,
@@ -461,9 +466,10 @@ export function aclColumns(): ColDef<AclVm>[] {
 
 /**
  * topic 表列（Lane4 打磨）：可选收藏星标列（传入 onToggleFavorite 才出现）。
- * 星标文案在 cellRenderer 内经 isFavorite 回调现读（模块级收藏态），配合
- * 调用方在收藏变化时重建 columnDefs 即可刷新；列不排序/过滤，不参与
- * 窄容器降级集（不入 MINIMAL_TOPIC_FIELDS）。
+ * 星标文案在 cellRenderer 内经 isFavorite 回调现读（模块级收藏态）；列定义
+ * 本身不依赖收藏集（perf-topics：收藏切换不再重建 columnDefs，星形刷新由
+ * 行级 cell 重渲染驱动——行 id 稳定后 ag-grid immutable 更新会重渲染变更行）。
+ * 列不排序/过滤，不参与窄容器降级集（不入 MINIMAL_TOPIC_FIELDS）。
  */
 export function topicColumns(
   options: { onToggleFavorite?: (row: TopicVm) => void; isFavorite?: (row: TopicVm) => boolean } = {},

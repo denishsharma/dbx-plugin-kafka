@@ -76,13 +76,15 @@ const offsetCustomTime = ref("");
 
 // P2-3：与侧栏 TopicTree 同源排序（sortTopicsPinned：internal 沉底 + 业务评分
 // + Lane4 收藏置顶），修复管理表默认顺序与侧栏树不一致。
-// 两个 computed 都读 topicFavorites()（模块级响应式收藏集）：收藏切换即重建
-// 行序与星标列（DbxAgGrid 以 setGridOption 批量应用 columnDefs/rowData）。
+// perf(topics)：只有行序 computed 读 topicFavorites()（模块级响应式收藏集）。
+// 行带稳定 id（TopicVm.id = topic name），收藏切换走 DbxAgGrid 的 immutable
+// 增量更新：行节点按 id 复用、数据变化的行重渲染单元格，星标列在 cellRenderer
+// 内现读收藏态即时换星；大表下不再整表换行。列定义 computed 不读收藏集——
+// 避免每次点星都重建 columnDefs（setGridOption 全列刷新）。
 const topicGridRows = computed(() => toTopicRows(sortTopicsPinned(props.topics, topicFavorites())));
-const topicGridCols = computed(() => {
-  topicFavorites();
-  return topicColumns({ onToggleFavorite: (row) => toggleTopicFavorite(row.name), isFavorite: (row) => isFavoriteTopic(row.name) }) as ColDef<TopicVm>[];
-});
+const topicGridCols = computed(() =>
+  topicColumns({ onToggleFavorite: (row) => toggleTopicFavorite(row.name), isFavorite: (row) => isFavoriteTopic(row.name) }) as ColDef<TopicVm>[],
+);
 const partitionGridRows = computed(() => toPartitionRows(partitions.value));
 const partitionGridCols = computed(() => partitionColumns() as ColDef<PartitionVm>[]);
 const offsetGridRows = computed(() => toTopicOffsetRows(offsetRows.value));
