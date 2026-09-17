@@ -6,58 +6,21 @@
 // commit×过滤互斥等校验在 lib/consumeForm.validateConsumeForm（纯函数，有单测）。
 // 布局压缩（R 路）：有结果后表单默认收起为一行摘要 chips 条（开合记忆
 // dbx.kafka.ui.msgFormOpen），结果表格吃满剩余高度；大数据量防护见各标注。
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { ChevronDown, ChevronsDown, Copy, Download, Play, Plus, Save, SlidersHorizontal, Trash2, X } from "@lucide/vue";
-import type { ColDef } from "ag-grid-community";
 import DbxAgGrid from "./DbxAgGrid.vue";
 import CodeEditor from "./CodeEditor.vue";
-import {
-  kafkaApi,
-  type ConsumeParams,
-  type ConsumeResult,
-  type DecodeMode,
-  type Decompression,
-  type FieldFilter,
-  type IsolationLevel,
-  type KafkaMessage,
-  type KafkaTopic,
-  type MatchMode,
-  type OffsetStrategy,
-  type SchemaAttach,
-  type SchemaFormat,
-  type SchemaSubject,
-} from "../lib/api";
-import {
-  MINIMAL_MESSAGE_FIELDS,
-  messageColumns,
-  toggleWorkbenchTimestampTz,
-  toMessageRows,
-  workbenchTimestampTz,
-  type MessageRow,
-} from "../lib/kafkaColumns";
-import {
-  formatMessageValue,
-  looksLikeJson,
-  looksLikeXml,
-  messageFullValueText,
-  type DecodedValue,
-  type ValueFormat,
-} from "../lib/messageCodec";
-import {
-  fieldFilterIssue,
-  isRangeReversed,
-  nowDatetimeLocal,
-  offsetTimeToParam,
-  offsetTimeToUnixMs,
-  parsePartitionList,
-  parsePartitionOffsetsText,
-  switchTimeInputMode,
-  validateConsumeForm,
-} from "../lib/consumeForm";
+import { kafkaApi, type ConsumeResult, type KafkaMessage, type KafkaTopic, type MatchMode, type OffsetStrategy } from "../lib/api";
+import type { MessageRow } from "../lib/kafkaColumns";
+import { MINIMAL_MESSAGE_FIELDS } from "../lib/kafkaColumns";
+import { messageFullValueText } from "../lib/messageCodec";
 import { serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
 import { formatTimestamp, timestampIso } from "../lib/timestamps";
-import { capRows, copyTextToClipboard, debounce } from "../lib/uiHelpers";
-import { decideModalKeydown, focusableElements } from "../lib/modalBehavior";
+import { copyTextToClipboard } from "../lib/uiHelpers";
+import { nowDatetimeLocal, validateConsumeForm } from "../lib/consumeForm";
+import { positiveInt, useConsumeForm } from "../composables/useConsumeForm";
+import { useConsumeResults } from "../composables/useConsumeResults";
+import { useMessageDetailDrawer } from "../composables/useMessageDetailDrawer";
 import { t } from "../lib/i18n";
 import type { UiIntentOutcome, UiIntentSummary } from "../../../shared/frontend/uiIntent";
 
@@ -81,264 +44,101 @@ function onTopicSelect(name: string) {
   if (name && name !== props.topic) emit("selectTopic", name);
 }
 
-// -- form state ---------------------------------------------------------------
+// -- form state（消费表单 + 预设：全部状态与参数构建在 useConsumeForm）--------
 
-const groupId = ref("");
-// 默认 recent（每分区从日志末端回退扫描窗口起读）：latest 只等新消息，查历史
-// 永远「已扫描 0」（issue #16）；流式面板不受影响（订阅语义本就是 tail）。
-const offsetStrategy = ref<OffsetStrategy>("recent");
-const offsetTimeText = ref("");
-const partitionsText = ref("");
-const partitionOffsetsText = ref("");
-const limit = ref("100");
-const timeoutMs = ref("5000");
-const maxScanRecords = ref("10000");
-const isolationLevel = ref<IsolationLevel>("read_uncommitted");
-const commit = ref(false);
-const filterText = ref("");
-const keyFilterText = ref("");
-const valueFilterText = ref("");
-const headerFilterText = ref("");
-const matchMode = ref<MatchMode>("contains");
-const fieldFilters = ref<FieldFilter[]>([]);
-const timestampFrom = ref("");
-const timestampTo = ref("");
-const offsetFrom = ref("");
-const offsetTo = ref("");
-const decode = ref<DecodeMode>("none");
-const decompression = ref<Decompression>("none");
+const form = useConsumeForm({
+  topic: () => props.topic,
+  srProvider: () => props.srProvider,
+  notify: (message) => emit("notify", message),
+  error: (message) => emit("error", message),
+});
+const {
+  groupId,
+  offsetStrategy,
+  offsetTimeText,
+  partitionsText,
+  partitionOffsetsText,
+  limit,
+  timeoutMs,
+  maxScanRecords,
+  isolationLevel,
+  commit,
+  filterText,
+  keyFilterText,
+  valueFilterText,
+  headerFilterText,
+  matchMode,
+  fieldFilters,
+  timestampFrom,
+  timestampTo,
+  offsetFrom,
+  offsetTo,
+  decode,
+  decompression,
+  formOpen,
+  toggleFormOpen,
+  strategyLabel,
+  decodeLabel,
+  filterCount,
+  openGroups,
+  toggleGroup,
+  tsMode,
+  tsFromMs,
+  tsToMs,
+  tsRangeReversed,
+  tsFromInvalid,
+  tsToInvalid,
+  toggleTsMode,
+  setNow,
+  fieldFilterIssueKey,
+  fieldFilterIssueText,
+  addFieldFilter,
+  removeFieldFilter,
+  schemaEnabled,
+  schemaSubjects,
+  schemaSubject,
+  schemaVersionText,
+  schemaFormat,
+  glueSchemaDisabled,
+  schemaVersions,
+  filtersDisabled,
+  groupDisabled,
+  partitionsDisabled,
+  hasFilters,
+  buildParams,
+  loadPresets,
+  savePreset,
+  applyPreset,
+  removePreset,
+  presets,
+  presetName,
+} = form;
 
 const consuming = ref(false);
-// 大数据量防护：result/行数组/详情 raw 均浅响应（shallowRef）——大数组不做深度
-// 代理，整体替换引用驱动更新；行上限裁剪见 applyResult/capRows。
-const result = shallowRef<ConsumeResult | null>(null);
+// 消费表单校验问题（i18n 文案；runConsume / applyIntentConsume 两处写入）。
 const formIssues = ref<string[]>([]);
-const presets = ref<Array<{ id: string; name: string }>>([]);
-const presetName = ref("");
-
-// -- 摘要条（收起态）：开合记忆 dbx.kafka.ui.msgFormOpen；无记忆时
-// 「未选 topic 或尚无结果」默认展开、消费成功后自动收起为摘要条。-------------
-
-const MSG_FORM_OPEN_KEY = "dbx.kafka.ui.msgFormOpen";
-
-function loadStoredFormOpen(): boolean | null {
-  try {
-    const raw = localStorage.getItem(MSG_FORM_OPEN_KEY);
-    if (raw === "1") return true;
-    if (raw === "0") return false;
-  } catch {
-    /* 存储不可用：走默认 */
-  }
-  return null;
-}
-
-const storedFormOpen = loadStoredFormOpen();
-// 条件抽屉（consume-drawer）默认收起：单行消费条 + 结果表格是常态布局。
-const formOpen = ref(storedFormOpen ?? false);
-
-watch(formOpen, (open) => {
-  try {
-    localStorage.setItem(MSG_FORM_OPEN_KEY, open ? "1" : "0");
-  } catch {
-    /* 内存态即可 */
-  }
-});
-
-function toggleFormOpen() {
-  formOpen.value = !formOpen.value;
-}
 
 // 摘要 chips：策略文案映射（无新增 i18n key，复用既有 strategy*/formatRaw）。
-const STRATEGY_LABEL_KEYS: Record<OffsetStrategy, string> = {
-  latest: "messages.strategyLatest",
-  recent: "messages.strategyRecent",
-  earliest: "messages.strategyEarliest",
-  committed: "messages.strategyCommitted",
-  timestamp: "messages.strategyTimestamp",
-  offset: "messages.strategyOffset",
-};
-const strategyLabel = computed(() => t(STRATEGY_LABEL_KEYS[offsetStrategy.value]));
-const decodeLabel = computed(() =>
-  decompression.value !== "none" ? `${decode.value} · ${decompression.value}` : decode.value === "none" ? t("messages.formatRaw") : decode.value,
-);
-// 生效过滤条件数：三+1 通道文本非空 + 启用且有值的 fieldFilters 行。
-const filterCount = computed(() => {
-  let count = 0;
-  if (filterText.value.trim()) count += 1;
-  if (keyFilterText.value.trim()) count += 1;
-  if (valueFilterText.value.trim()) count += 1;
-  if (headerFilterText.value.trim()) count += 1;
-  count += fieldFilters.value.filter((row) => row.enabled && row.value.trim().length > 0).length;
-  return count;
-});
+// 生效过滤条件数 / 分组开合 / 时间双模式：见 useConsumeForm（composable）。
 
-// -- 筛选区分组（基础/定位/时间与范围/过滤/解码）：前两组（基础、定位）默认展开；
-// 后三组可折叠，开态记忆在 dbx.kafka.ui.msgFilters（JSON 对象，高级项折叠）。
+// -- 详情抽屉（useMessageDetailDrawer）+ 结果表（useConsumeResults）------------
 
-type ConsumeGroupKey = "basic" | "locate" | "timeRange" | "filter" | "decode";
-const MSG_FILTERS_KEY = "dbx.kafka.ui.msgFilters";
-const GROUP_DEFAULTS: Record<ConsumeGroupKey, boolean> = { basic: true, locate: true, timeRange: true, filter: true, decode: false };
-// 可折叠记忆的组 = 除「基础」「定位」外的三组（前两组常驻展开，不落盘）。
-const COLLAPSIBLE_GROUPS = ["timeRange", "filter", "decode"] as const;
-
-function loadOpenGroups(): Record<ConsumeGroupKey, boolean> {
-  const open = { ...GROUP_DEFAULTS };
-  try {
-    const raw = JSON.parse(localStorage.getItem(MSG_FILTERS_KEY) ?? "") as Partial<Record<ConsumeGroupKey, unknown>> | null;
-    if (raw && typeof raw === "object") {
-      for (const key of COLLAPSIBLE_GROUPS) {
-        if (typeof raw[key] === "boolean") open[key] = raw[key] as boolean;
-      }
-    }
-  } catch {
-    /* 无记忆/损坏 → 默认 */
-  }
-  return open;
-}
-
-const openGroups = ref(loadOpenGroups());
-
-watch(
-  openGroups,
-  (value) => {
-    try {
-      localStorage.setItem(
-        MSG_FILTERS_KEY,
-        JSON.stringify(Object.fromEntries(COLLAPSIBLE_GROUPS.map((key) => [key, value[key]]))),
-      );
-    } catch {
-      /* 存储不可用：仅内存态 */
-    }
-  },
-  { deep: true },
-);
-
-function toggleGroup(key: ConsumeGroupKey) {
-  openGroups.value[key] = !openGroups.value[key];
-}
-
-// -- 时间与范围输入（timestampFrom/To：datetime-local ↔ unix ms 双模式）---------
-
-const tsMode = ref<"datetime" | "unix">("datetime");
-
-const tsFromMs = computed(() => offsetTimeToUnixMs(timestampFrom.value));
-const tsToMs = computed(() => offsetTimeToUnixMs(timestampTo.value));
-const tsRangeReversed = computed(() => isRangeReversed(tsFromMs.value, tsToMs.value));
-const tsFromInvalid = computed(() => Boolean(timestampFrom.value.trim()) && tsFromMs.value === null);
-const tsToInvalid = computed(() => Boolean(timestampTo.value.trim()) && tsToMs.value === null);
-
-function toggleTsMode() {
-  const next = tsMode.value === "datetime" ? "unix" : "datetime";
-  timestampFrom.value = switchTimeInputMode(timestampFrom.value, next);
-  timestampTo.value = switchTimeInputMode(timestampTo.value, next);
-  tsMode.value = next;
-}
-
-function setNow(target: "from" | "to") {
-  if (tsMode.value === "unix") {
-    if (target === "from") timestampFrom.value = String(Date.now());
-    else timestampTo.value = String(Date.now());
-    return;
-  }
-  if (target === "from") timestampFrom.value = nowDatetimeLocal();
-  else timestampTo.value = nowDatetimeLocal();
-}
-
-// -- fieldFilters 行校验（数值比较 operator 需要 value 可转数字）------------------
-
-function fieldFilterIssueKey(index: number): string | null {
-  const row = fieldFilters.value[index];
-  if (!row) return null;
-  // fieldFilterIssue 纯函数返回片段（fieldValueNumeric）；展示统一走 uiFilterValueRequired。
-  return fieldFilterIssue(row) ? "messages.uiFilterValueRequired" : null;
-}
-
-function fieldFilterIssueText(index: number): string {
-  const key = fieldFilterIssueKey(index);
-  return key ? t(key) : "";
-}
-
-// -- schema mount（Phase 2：SR 解码挂载，version 空 = latest）---------------------
-
-const schemaEnabled = ref(false);
-const schemaSubjects = ref<SchemaSubject[]>([]);
-const schemaSubject = ref("");
-const schemaVersionText = ref("");
-const schemaFormat = ref<SchemaFormat>("avro");
-// Phase P：Glue 仅管理面（消息编解码仅 Confluent wire format，后端 -32000 拒绝），
-// 前端同步禁用挂载区并提示（保留 discoverability，不隐藏）。
-const glueSchemaDisabled = computed(() => props.srProvider === "glue");
-watch(glueSchemaDisabled, (disabled) => {
-  if (disabled) schemaEnabled.value = false;
-});
-const schemaVersions = computed(() => {
-  const subject = schemaSubjects.value.find((row) => row.subject === schemaSubject.value);
-  const latest = subject?.latestVersion ?? 0;
-  return Array.from({ length: Math.max(latest, 0) }, (_unused, index) => latest - index);
-});
-
-async function loadSchemaSubjects() {
-  try {
-    // registry 参数省略 = 连接默认提供方（Glue 下挂载区已禁用，此列表仅供展示兜底）。
-    const response = await kafkaApi.schemaSubjectsList();
-    schemaSubjects.value = response.subjects ?? [];
-  } catch {
-    // SR 未启用/旧 sidecar：挂载区下拉为空且可关闭，不阻断消费主流程。
-    schemaSubjects.value = [];
-  }
-}
-
-watch(schemaEnabled, (enabled) => {
-  if (enabled && schemaSubjects.value.length === 0) void loadSchemaSubjects();
-});
-
-watch(schemaSubject, () => {
-  schemaVersionText.value = "";
-  const found = schemaSubjects.value.find((row) => row.subject === schemaSubject.value);
-  if (found?.formats?.length) schemaFormat.value = (found.formats[0] as SchemaFormat) ?? "avro";
-});
-
-function buildSchemaAttach(): SchemaAttach | undefined {
-  if (glueSchemaDisabled.value) return undefined;
-  if (!schemaEnabled.value || !schemaSubject.value) return undefined;
-  const version = Number.parseInt(schemaVersionText.value, 10);
-  return {
-    subject: schemaSubject.value,
-    ...(Number.isFinite(version) && version > 0 ? { version } : {}),
-    format: schemaFormat.value,
-  };
-}
-
-// commit 开启后过滤通道全部禁用（§5.3：commit 与过滤互斥，后端同规则）。
-const filtersDisabled = computed(() => commit.value);
-// 显式 partitions 与 groupId 互斥（§5.3）。
-const groupDisabled = computed(() => parsePartitionList(partitionsText.value).length > 0);
-const partitionsDisabled = computed(() => commit.value || Boolean(groupId.value.trim()));
-const hasFilters = computed(() => filterCount.value > 0);
-const detail = shallowRef<KafkaMessage | null>(null);
-// 行数组浅响应 + 引用替换（不逐条改）；rowsTotal 为裁前行数（裁剪提示用）。
-const messageRows = shallowRef<MessageRow[]>([]);
-const rowsTotal = ref(0);
-const rowsDropped = computed(() => Math.max(0, rowsTotal.value - messageRows.value.length));
-const messageCols = computed(() =>
-  messageColumns({ onCopyJson: (row) => void copyMessageJson(row) }) as ColDef<MessageRow>[],
-);
-
-// -- 即时搜索（F6-1）/时区切换（F6-3）/复制族（F6-2）---------------------------
-// quickFilter：输入防抖 150ms 后喂给 DbxAgGrid.quickFilterText（只过滤已加载行）。
-const quickFilterInput = ref("");
-const quickFilter = ref("");
-const applyQuickFilter = debounce((value: string) => {
-  quickFilter.value = value;
-}, 150);
-
-onBeforeUnmount(() => applyQuickFilter.cancel());
-
-const tzLabel = computed(() => (workbenchTimestampTz.value === "utc" ? "UTC" : t("messages.tzLocal")));
-
-function toggleTz() {
-  toggleWorkbenchTimestampTz();
-}
+const {
+  detail,
+  viewFormat,
+  viewDecode,
+  viewDecompression,
+  viewResult,
+  viewBusy,
+  showFullBase64,
+  headersView,
+  sectionsOpen,
+  headersEntries,
+  headersJsonText,
+  toggleSection,
+  renderView,
+  drawerEl,
+} = useMessageDetailDrawer();
 
 async function copyWithNotify(text: string) {
   const ok = await copyTextToClipboard(text);
@@ -367,31 +167,21 @@ const resultMetaEl = ref<HTMLElement | null>(null);
 // 消息表实例（跳到最新经 DbxAgGrid.goToLatest 走 gridApi：末页 + 滚入视口）。
 const messagesGrid = ref<InstanceType<typeof DbxAgGrid> | null>(null);
 
-/** 行数组重建（tz 切换/结果落地共用）：capRows 裁剪 → toMessageRows（按当前
- *  时区格式化）→ 引用替换一次性提交。 */
-function rebuildRows() {
-  const capped = capRows(result.value?.messages ?? []);
-  messageRows.value = toMessageRows(capped.rows);
-  triggerRef(messageRows);
-  rowsTotal.value = capped.total;
-}
-
-/** 消费结果落地（唯一入口）：capRows 裁剪（保留最新 N 条）→ 批量构建行数组 →
- *  引用替换一次性提交（DbxAgGrid 以单次 setGridOption 批量应用，配合稳定
- *  getRowId，无逐条更新）。 */
-function applyResult(next: ConsumeResult | null) {
-  result.value = next;
-  rebuildRows();
-}
-
-// F6-3：时区切换后行内已格式化文本需要重建（列 valueFormatter 是响应式的，
-// 行文本不是——统一在这里重算）。
-watch(workbenchTimestampTz, () => rebuildRows());
-
-function openDetail(row: MessageRow) {
-  // 详情 raw 单份存储：直接引用行内 raw（与 result.messages 同一对象，不拷贝）。
-  detail.value = row.raw;
-}
+const {
+  result,
+  messageRows,
+  rowsTotal,
+  rowsDropped,
+  messageCols,
+  quickFilterInput,
+  quickFilter,
+  applyQuickFilter,
+  workbenchTimestampTz,
+  tzLabel,
+  toggleTz,
+  applyResult,
+  openDetail,
+} = useConsumeResults({ detail, onCopyJson: (row) => void copyMessageJson(row) });
 
 /** 跳到最新（R 路）：滚回结果区锚点 + 经 DbxAgGrid.goToLatest 跳分页末页并
  *  把最后一行滚入视口底部（最新数据行可见；分页模式由 gridApi 处理）。 */
@@ -400,83 +190,7 @@ function jumpToLatest() {
   messagesGrid.value?.goToLatest();
 }
 
-function positiveInt(value: unknown, fallback: number): number {
-  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function optionalNumber(value: unknown): number | undefined {
-  // P1-6：Vue 3 对 <input type="number"> 的 v-model 可能给 number（科学计数/清空
-  // 过程），直接 .trim() 抛 TypeError 且消费请求不发出——入参一律 String 归一
-  // （与 ProducePanel/GroupsPanel 同范式修复）。
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return undefined;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-// -- field filters editor -------------------------------------------------------
-
-function addFieldFilter() {
-  fieldFilters.value.push({ source: "value", path: "", operator: "contains", value: "", enabled: true });
-}
-
-function removeFieldFilter(index: number) {
-  fieldFilters.value.splice(index, 1);
-}
-
-// -- params build / validation ---------------------------------------------------
-
-function buildParams(topicOverride?: string): ConsumeParams {
-  const offsetTime = offsetStrategy.value === "timestamp" ? offsetTimeToParam(offsetTimeText.value) : null;
-  const partitions = parsePartitionList(partitionsText.value);
-  const partitionOffsets = parsePartitionOffsetsText(partitionOffsetsText.value);
-  const params: ConsumeParams = {
-    topic: topicOverride ?? props.topic,
-    offsetStrategy: offsetStrategy.value,
-    isolationLevel: isolationLevel.value,
-    limit: positiveInt(limit.value, 100),
-    timeoutMs: positiveInt(timeoutMs.value, 5000),
-    maxScanRecords: positiveInt(maxScanRecords.value, 10000),
-    decode: decode.value,
-    decompression: decompression.value,
-  };
-  const schema = buildSchemaAttach();
-  if (schema) params.schema = schema;
-  if (groupId.value.trim() && partitions.length === 0) params.groupId = groupId.value.trim();
-  if (partitions.length > 0 && !params.groupId) params.partitions = partitions;
-  if (offsetStrategy.value === "offset" && Object.keys(partitionOffsets).length > 0) {
-    params.partitionOffsets = partitionOffsets;
-  }
-  if (offsetTime !== null) params.offsetTime = offsetTime;
-  if (commit.value && params.groupId) {
-    params.commit = true;
-    return params; // commit 与过滤互斥，不再附带任何过滤字段
-  }
-  if (filterText.value.trim()) params.filter = filterText.value.trim();
-  if (keyFilterText.value.trim()) params.keyFilter = keyFilterText.value.trim();
-  if (valueFilterText.value.trim()) params.valueFilter = valueFilterText.value.trim();
-  if (headerFilterText.value.trim()) params.headerFilter = headerFilterText.value.trim();
-  if (hasFilters.value) params.matchMode = matchMode.value;
-  const enabledFilters = fieldFilters.value.filter((row) => row.enabled && row.value.trim().length > 0);
-  if (enabledFilters.length > 0) {
-    params.fieldFilters = enabledFilters.map((row) => ({
-      source: row.source,
-      operator: row.operator,
-      value: row.value,
-      ...(row.path && row.path.trim() ? { path: row.path.trim() } : {}),
-    }));
-  }
-  const tsFrom = offsetTimeToUnixMs(timestampFrom.value); // datetime-local/unix ms/RFC3339 → unix ms；空/非法 → null
-  const tsTo = offsetTimeToUnixMs(timestampTo.value);
-  const offFrom = optionalNumber(offsetFrom.value);
-  const offTo = optionalNumber(offsetTo.value);
-  if (tsFrom !== null) params.timestampFrom = tsFrom;
-  if (tsTo !== null) params.timestampTo = tsTo;
-  if (offFrom !== undefined) params.offsetFrom = offFrom;
-  if (offTo !== undefined) params.offsetTo = offTo;
-  return params;
-}
+// -- field filters 编辑 / 参数构建 / 表单校验：见 useConsumeForm（composable）。
 
 // P1-7：消费请求序号守卫——topic 切换/重新消费都会自增；晚到的旧响应落地前
 // 与当前序号比对，不一致即丢弃，避免旧 topic 消息串台到新选中 topic 名下。
@@ -641,89 +355,14 @@ async function applyIntentSelect(params: Record<string, unknown>): Promise<UiInt
 
 defineExpose({ applyIntentConsume, applyIntentSelect });
 
-// -- presets ---------------------------------------------------------------------
-
-async function loadPresets() {
-  try {
-    const response = await kafkaApi.presetsList();
-    // type=monitor 的预设归 MonitorPanel 管（同一 store，互不混显）。
-    presets.value = (response.presets ?? [])
-      .filter((preset) => preset.params?.type !== "monitor")
-      .map((preset) => ({ id: preset.id, name: preset.name }));
-  } catch {
-    presets.value = [];
-  }
-}
-
-function currentFormParams(): ConsumeParams {
-  return { ...buildParams(), topic: "" };
-}
-
-async function savePreset() {
-  const name = presetName.value.trim();
-  if (!name) return;
-  try {
-    await kafkaApi.presetsSave({ id: `preset-${Date.now()}`, name, params: currentFormParams() });
-    presetName.value = "";
-    emit("notify", t("messages.presetSaved"));
-    await loadPresets();
-  } catch (cause) {
-    emit("error", cause instanceof Error ? cause.message : String(cause));
-  }
-}
-
-async function applyPreset(id: string) {
-  try {
-    const response = await kafkaApi.presetsList();
-    const preset = (response.presets ?? []).find((row) => row.id === id);
-    if (!preset) return;
-    const params = preset.params ?? {};
-    groupId.value = params.groupId ?? "";
-    offsetStrategy.value = params.offsetStrategy ?? "recent";
-    offsetTimeText.value = typeof params.offsetTime === "string" ? params.offsetTime : params.offsetTime ? String(params.offsetTime) : "";
-    partitionsText.value = (params.partitions ?? []).join(",");
-    partitionOffsetsText.value = Object.entries(params.partitionOffsets ?? {})
-      .map(([partition, offset]) => `${partition}=${offset}`)
-      .join(",");
-    limit.value = String(params.limit ?? 100);
-    timeoutMs.value = String(params.timeoutMs ?? 5000);
-    maxScanRecords.value = String(params.maxScanRecords ?? 10000);
-    isolationLevel.value = params.isolationLevel ?? "read_uncommitted";
-    commit.value = params.commit === true;
-    filterText.value = params.filter ?? "";
-    keyFilterText.value = params.keyFilter ?? "";
-    valueFilterText.value = params.valueFilter ?? "";
-    headerFilterText.value = params.headerFilter ?? "";
-    matchMode.value = params.matchMode ?? "contains";
-    fieldFilters.value = (params.fieldFilters ?? []).map((row) => ({ ...row, enabled: true }));
-    decode.value = params.decode ?? "none";
-    decompression.value = params.decompression ?? "none";
-    schemaEnabled.value = Boolean(params.schema);
-    schemaSubject.value = params.schema?.subject ?? "";
-    schemaVersionText.value = params.schema?.version !== undefined ? String(params.schema.version) : "";
-    schemaFormat.value = params.schema?.format === "protobuf" || params.schema?.format === "json" ? params.schema.format : "avro";
-    emit("notify", t("messages.presetApplied"));
-  } catch (cause) {
-    emit("error", cause instanceof Error ? cause.message : String(cause));
-  }
-}
-
-async function removePreset(id: string) {
-  try {
-    await kafkaApi.presetsRemove(id);
-    await loadPresets();
-    emit("notify", t("messages.presetRemoved"));
-  } catch (cause) {
-    emit("error", cause instanceof Error ? cause.message : String(cause));
-  }
-}
+// -- presets：load/save/apply/remove 见 useConsumeForm（composable）。------------
 
 // -- export ------------------------------------------------------------------------
 
 async function exportMessages(format: "json" | "csv" | "tsv") {
   if (!result.value || result.value.messages.length === 0) return;
   // Lane4 打磨：后端 kafka/messages/export 仅接受 json/csv（其余 -32000），
-  // TSV 走前端序列化——直接导出当前已加载结果行（复用 kafkaModel 的保真
+  // TSV 走前端序列化——直接导出当前已加载结果行（复用 messageExport 的保真
   // value 文本与 TSV 转义；列序/行分隔与后端 CSV 一致），不发额外请求。
   if (format === "tsv") {
     downloadText("kafka-messages.tsv", "text/tab-separated-values", serializeMessagesToTsv(result.value.messages));
@@ -754,54 +393,7 @@ function downloadText(name: string, contentType: string, text: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-// -- detail drawer（本地二次 decode/format，valueBase64 保真来源）-----------------
-// 详情体验 v2：headers 表格 ⇄ JSON 切换 + 行级复制；value 走 CodeEditor 只读
-//（JSON 高亮/换行开关/内部滚动），复制按钮收敛到各区块标题行（行内/头部 icon）。
-
-const viewFormat = ref<ValueFormat>("raw");
-const viewDecode = ref<DecodeMode>("none");
-const viewDecompression = ref<Decompression>("none");
-const viewResult = ref<DecodedValue>({ text: "" });
-const viewBusy = ref(false);
-const showFullBase64 = ref(false);
-// headers 展示形态：表格（key|value+行复制，默认）/ 格式化 JSON。
-const headersView = ref<"table" | "json">("table");
-// Headers / Value 区块折叠态（抽屉内会话级；默认全展开）。
-const sectionsOpen = ref({ headers: true, value: true });
-const headersEntries = computed(() => Object.entries(detail.value?.headers ?? {}));
-const headersJsonText = computed(() => JSON.stringify(detail.value?.headers ?? {}, null, 2));
-
-watch(detail, (message) => {
-  showFullBase64.value = false;
-  headersView.value = "table";
-  sectionsOpen.value = { headers: true, value: true };
-  if (!message) return;
-  const text = messageFullValueText(message).trim();
-  viewFormat.value = looksLikeXml(text) ? "xml" : looksLikeJson(text) ? "json" : "raw";
-  viewDecode.value = "none";
-  viewDecompression.value = "none";
-  void renderView();
-});
-
-function toggleSection(name: "headers" | "value") {
-  sectionsOpen.value = { ...sectionsOpen.value, [name]: !sectionsOpen.value[name] };
-}
-
-async function renderView() {
-  const message = detail.value;
-  if (!message) return;
-  viewBusy.value = true;
-  try {
-    viewResult.value = await formatMessageValue(message, {
-      decode: viewDecode.value,
-      decompression: viewDecompression.value,
-      format: viewFormat.value,
-    });
-  } finally {
-    viewBusy.value = false;
-  }
-}
-
+// -- detail drawer（useMessageDetailDrawer：视图状态/渲染/焦点陷阱在 composable）--
 // 编辑器直接承载全量解码/格式化文本（CodeMirror 虚拟渲染，16384 截断预览
 // 退役）——「所见即所复制」：copy-value 复制当前解码/格式化结果文本。
 
@@ -810,52 +402,6 @@ function downloadValue() {
   if (!message) return;
   downloadText(`${message.topic}-p${message.partition}-o${message.offset}.txt`, "text/plain", messageFullValueText(message));
 }
-
-// -- 弹层交互（P1-2/P1-3）：抽屉 Esc 关闭 + Tab 焦点陷阱 + 关闭归还触发元素 --------
-// 决策逻辑在 kafkaModel.decideModalKeydown（纯函数，有单测），这里只做 DOM 接线。
-
-const drawerEl = ref<HTMLElement | null>(null);
-let drawerTrigger: HTMLElement | null = null;
-
-watch(detail, (message, previous) => {
-  if (message && !previous) {
-    // 打开：记住触发元素，下一帧焦点进抽屉（首个可交互控件，兜底抽屉容器）。
-    drawerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    void nextTick(() => {
-      const drawer = drawerEl.value;
-      if (!drawer) return;
-      const first = focusableElements(drawer)[0];
-      (first ?? drawer).focus({ preventScroll: true });
-    });
-  } else if (!message && previous) {
-    // 关闭（Esc/✕/遮罩）：焦点归还触发元素，遮罩随 v-if 一并卸载、无残留。
-    drawerTrigger?.focus({ preventScroll: true });
-    drawerTrigger = null;
-  }
-});
-
-function onWindowKeydown(event: KeyboardEvent) {
-  if (!detail.value) return;
-  // 更高层弹窗（连接弹窗 / teleport 助手弹窗）在场时让位，不抢 Esc/Tab。
-  if (document.querySelector(".workbench .modal-backdrop, body > .modal-backdrop")) return;
-  const drawer = drawerEl.value;
-  if (!drawer) return;
-  const focusables = focusableElements(drawer);
-  const currentIndex = focusables.indexOf(document.activeElement as HTMLElement);
-  const decision = decideModalKeydown(event.key, event.shiftKey, focusables.length, currentIndex);
-  if (decision.kind === "close") {
-    event.preventDefault();
-    event.stopPropagation();
-    detail.value = null;
-  } else if (decision.kind === "focus") {
-    event.preventDefault();
-    event.stopPropagation();
-    focusables[decision.index]?.focus();
-  }
-}
-
-onMounted(() => window.addEventListener("keydown", onWindowKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onWindowKeydown));
 
 // topic 切换后清空旧结果（跨 topic 结果混排会误导）；无开合记忆时回到默认展开
 // （「尚无结果默认展开」语义），有记忆则维持记忆。
