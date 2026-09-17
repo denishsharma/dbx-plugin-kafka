@@ -3,7 +3,7 @@
 // 精确 seek、isolation/commit 互斥、三通道过滤 + matchMode + fieldFilters、
 // 时间/offset 范围、decode/decompression），消息表 + 详情抽屉（本地二次
 // decode/format、valueBase64 完整查看/下载）+ JSON/CSV 导出 + 消费预设。
-// commit×过滤互斥等校验在 lib/kafkaModel.validateConsumeForm（纯函数，有单测）。
+// commit×过滤互斥等校验在 lib/consumeForm.validateConsumeForm（纯函数，有单测）。
 // 布局压缩（R 路）：有结果后表单默认收起为一行摘要 chips 条（开合记忆
 // dbx.kafka.ui.msgFormOpen），结果表格吃满剩余高度；大数据量防护见各标注。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, triggerRef, watch } from "vue";
@@ -36,31 +36,28 @@ import {
   type MessageRow,
 } from "../lib/kafkaColumns";
 import {
-  capRows,
-  copyTextToClipboard,
-  debounce,
-  decideModalKeydown,
-  fieldFilterIssue,
-  focusableElements,
   formatMessageValue,
-  formatTimestamp,
-  isRangeReversed,
   looksLikeJson,
   looksLikeXml,
   messageFullValueText,
+  type DecodedValue,
+  type ValueFormat,
+} from "../lib/messageCodec";
+import {
+  fieldFilterIssue,
+  isRangeReversed,
   nowDatetimeLocal,
   offsetTimeToParam,
   offsetTimeToUnixMs,
   parsePartitionList,
   parsePartitionOffsetsText,
-  serializeMessagesToJson,
-  serializeMessagesToTsv,
   switchTimeInputMode,
-  timestampIso,
   validateConsumeForm,
-  type DecodedValue,
-  type ValueFormat,
-} from "../lib/kafkaModel";
+} from "../lib/consumeForm";
+import { serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
+import { formatTimestamp, timestampIso } from "../lib/timestamps";
+import { capRows, copyTextToClipboard, debounce } from "../lib/uiHelpers";
+import { decideModalKeydown, focusableElements } from "../lib/modalBehavior";
 import { t } from "../lib/i18n";
 import type { UiIntentOutcome, UiIntentSummary } from "../../../shared/frontend/uiIntent";
 

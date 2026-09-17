@@ -10,7 +10,7 @@ import { isDbxPluginTheme, onHostThemeChange, themeToAppearance } from "./lib/ho
 import { setWorkbenchLocale, t } from "./lib/i18n";
 import { kafkaApi, setKafkaConnectionId, type KafkaStreamErrorEvent, type KafkaStreamMessagesEvent, type KafkaTopic } from "./lib/api";
 import { friendlyKafkaError } from "./lib/kafkaErrors";
-import { decideModalKeydown, focusableElements } from "./lib/kafkaModel";
+import { decideModalKeydown, focusableElements } from "./lib/modalBehavior";
 import { parseAuditEvent, pushAuditItem, type AuditFeedItem } from "./lib/auditFeed";
 import { useUiIntent, type UiIntentOutcome } from "../../shared/frontend/uiIntent";
 import TopicTree from "./components/TopicTree.vue";
@@ -124,7 +124,7 @@ const uiIntent = useUiIntent("kafka", uiIntentHandlers);
 
 // -- 连接弹窗交互（P1-2/P1-3）：Esc 关闭 + Tab 焦点陷阱 + 关闭归还触发元素 --------
 // ConnectionsPanel 不可内改，keydown 在 App 壳层监听；决策逻辑走
-// kafkaModel.decideModalKeydown（纯函数，有单测）。
+// modalBehavior.decideModalKeydown（纯函数，有单测）。
 
 const connectionsTrigger = ref<HTMLElement | null>(null);
 

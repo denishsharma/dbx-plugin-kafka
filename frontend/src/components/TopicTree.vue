@@ -9,7 +9,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { ChevronsLeft, ChevronsRight, Eye, EyeOff, HardDrive, RefreshCw, Search, Star, X } from "@lucide/vue";
 import type { KafkaTopic } from "../lib/api";
-import { filterTopics, sortTopicsPinned } from "../lib/kafkaModel";
+import { filterTopics, sortTopicsPinned } from "../lib/topics";
 import { isFavoriteTopic, toggleTopicFavorite, topicFavorites } from "../lib/topicFavorites";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";

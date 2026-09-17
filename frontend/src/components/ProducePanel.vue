@@ -12,7 +12,7 @@
 // → 行内提示改用 template；手动挂载区 avro/json/protobuf 三格式均可用，后端
 // encodeForProduce 对 PROTOBUF 补 Confluent message index 段）；template 走
 // 占位符展开；自动停止：read_only / 校验失败 / 连续失败≥3 / 条数上限 / 时长
-// 上限（Lane 2）。生成器与占位符纯函数在 lib/kafkaModel（固定向量 spec）。
+// 上限（Lane 2）。生成器与占位符纯函数在 lib/flowRandom（固定向量 spec）。
 // Lane 2 投递参数：acks（all 默认 | 1）+ 幂等生产开关（默认开）——与后端
 // franz-go 能力对齐（acks=0 不做：同步 ProduceSync 依赖 broker 响应）；
 // 仅在偏离默认时随请求携带（acks!=="all" / enableIdempotence=false）。
@@ -26,12 +26,12 @@ import {
   clampFlowIntervalMs,
   expandTemplate,
   generateAvroRandom,
-  isInternalTopicName,
   matchingSchemaSubjects,
   mulberry32,
-  parseHeadersJson,
-  partitionInputIssue,
-} from "../lib/kafkaModel";
+} from "../lib/flowRandom";
+import { isInternalTopicName } from "../lib/topics";
+import { parseHeadersJson } from "../lib/jsonText";
+import { partitionInputIssue } from "../lib/uiHelpers";
 import { t } from "../lib/i18n";
 
 const props = defineProps<{

@@ -22,7 +22,8 @@ import {
   type GroupRow,
   type MemberVm,
 } from "../lib/kafkaColumns";
-import { parseGroupOffsetTargetsText, sumLag } from "../lib/kafkaModel";
+import { parseGroupOffsetTargetsText } from "../lib/consumeForm";
+import { sumLag } from "../lib/topics";
 import { useModalBehavior } from "../lib/modalBehavior";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";

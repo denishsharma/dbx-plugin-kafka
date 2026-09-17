@@ -23,7 +23,9 @@ import {
   type TopicOffsetVm,
   type TopicVm,
 } from "../lib/kafkaColumns";
-import { offsetTimeToParam, parseHeadersJson, sortTopicsPinned } from "../lib/kafkaModel";
+import { offsetTimeToParam } from "../lib/consumeForm";
+import { parseHeadersJson } from "../lib/jsonText";
+import { sortTopicsPinned } from "../lib/topics";
 import { isFavoriteTopic, toggleTopicFavorite, topicFavorites } from "../lib/topicFavorites";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { useModalBehavior } from "../lib/modalBehavior";

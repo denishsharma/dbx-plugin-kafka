@@ -9,7 +9,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { ClipboardPaste, Network, RefreshCw, X } from "@lucide/vue";
 import { getKafkaConnectionId, kafkaApi, type KafkaConnectionStatus } from "../lib/api";
-import { buildPropertyMappings, focusableElements, parsePropertiesText, decideModalKeydown, type PropertyMappingRow } from "../lib/kafkaModel";
+import { buildPropertyMappings, parsePropertiesText, type PropertyMappingRow } from "../lib/properties";
+import { decideModalKeydown, focusableElements } from "../lib/modalBehavior";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";
 

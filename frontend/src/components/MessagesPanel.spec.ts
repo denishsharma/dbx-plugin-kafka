@@ -8,7 +8,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, type PropType } from "vue";
 import MessagesPanel from "./MessagesPanel.vue";
 import { setKafkaConnectionId, type ConsumeResult, type KafkaMessage } from "../lib/api";
-import { formatTimestamp } from "../lib/kafkaModel";
+import { formatTimestamp } from "../lib/timestamps";
 import { setWorkbenchTimestampTz } from "../lib/kafkaColumns";
 import { t } from "../lib/i18n";
 

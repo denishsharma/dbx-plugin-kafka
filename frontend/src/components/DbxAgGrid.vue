@@ -23,7 +23,7 @@ import {
   minimalColumns,
   savePreferredPageSize,
 } from "../lib/kafkaColumns";
-import { copyTextToClipboard } from "../lib/kafkaModel";
+import { copyTextToClipboard } from "../lib/uiHelpers";
 import { t } from "../lib/i18n";
 
 export interface GridContextMenuItem {

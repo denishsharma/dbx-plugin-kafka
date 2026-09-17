@@ -25,7 +25,8 @@ import type {
   TopicOffsetRow,
   TopicPartitionInfo,
 } from "./api";
-import { formatTimestamp, timestampFilterTextComparator, timestampIso, headersPreview, previewText, type TimestampTz } from "./kafkaModel";
+import { formatTimestamp, timestampFilterTextComparator, timestampIso, type TimestampTz } from "./timestamps";
+import { headersPreview, previewText } from "./uiHelpers";
 import { t, workbenchLocale } from "./i18n";
 
 // -- timestamp timezone（F6-3：本地/UTC 切换，localStorage `kafka.ts.tz` 记忆）-----

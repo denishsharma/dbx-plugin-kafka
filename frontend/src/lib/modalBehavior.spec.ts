@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { useModalBehavior } from "./modalBehavior";
+import { decideModalKeydown, useModalBehavior } from "./modalBehavior";
 
 type HarnessExposed = {
   openA: ReturnType<typeof ref<boolean>>;
@@ -141,5 +141,38 @@ describe("useModalBehavior", () => {
     // 主弹层控件不参与回绕（焦点未跳去 .a1）。
     expect(document.activeElement).not.toBe(wrapper.find(".a1").element);
     wrapper.unmount();
+  });
+});
+
+// 纯决策函数单测（自 kafkaModel.spec 迁入）。
+describe("modal keydown decision (Esc close + Tab focus trap)", () => {
+  it("closes on Escape regardless of Tab state", () => {
+    expect(decideModalKeydown("Escape", false, 0, -1)).toEqual({ kind: "close" });
+    expect(decideModalKeydown("Escape", true, 5, 2)).toEqual({ kind: "close" });
+  });
+
+  it("ignores non-Esc/Tab keys and empty containers", () => {
+    expect(decideModalKeydown("Enter", false, 5, 0)).toEqual({ kind: "none" });
+    expect(decideModalKeydown("Tab", false, 0, -1)).toEqual({ kind: "none" });
+    expect(decideModalKeydown("Tab", true, 0, 3)).toEqual({ kind: "none" });
+  });
+
+  it("cycles forward with wrap-around", () => {
+    expect(decideModalKeydown("Tab", false, 3, 0)).toEqual({ kind: "focus", index: 1 });
+    expect(decideModalKeydown("Tab", false, 3, 2)).toEqual({ kind: "focus", index: 0 });
+  });
+
+  it("cycles backward with wrap-around", () => {
+    expect(decideModalKeydown("Tab", true, 3, 2)).toEqual({ kind: "focus", index: 1 });
+    expect(decideModalKeydown("Tab", true, 3, 0)).toEqual({ kind: "focus", index: 2 });
+  });
+
+  it("enters at the start/end when focus is outside the container", () => {
+    // 焦点尚未进容器（如打开瞬间）：Tab 进首个控件，Shift+Tab 进最后一个。
+    expect(decideModalKeydown("Tab", false, 4, -1)).toEqual({ kind: "focus", index: 0 });
+    expect(decideModalKeydown("Tab", true, 4, -1)).toEqual({ kind: "focus", index: 3 });
+    // 越界（焦点被容器外逻辑移走）同样按方向兜底。
+    expect(decideModalKeydown("Tab", false, 4, 99)).toEqual({ kind: "focus", index: 0 });
+    expect(decideModalKeydown("Tab", true, 4, 99)).toEqual({ kind: "focus", index: 3 });
   });
 });

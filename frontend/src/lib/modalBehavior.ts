@@ -2,13 +2,14 @@
  * 弹层行为下沉（UI 扫描第 2 轮 P1-5）：modal/drawer 通用的
  * 「Esc 关闭 + Tab 焦点陷阱 + 打开聚焦 + 关闭归还触发元素」组合式函数。
  *
- * 决策逻辑复用 kafkaModel.decideModalKeydown（纯函数，有单测）；本模块只做
- * DOM 接线（与 MessagesPanel 抽屉 / ConnectionsPanel 主弹窗的已验证实现同源）。
- * 层级语义照连接弹窗导入助手子弹层的捕获态参照：后打开的层在上，keydown 只由
- * 栈顶层响应——子弹层在场时 Esc 只关子弹层、不透传给下层（2→1→0 逐层关闭）。
+ * 决策纯逻辑（FOCUSABLE_SELECTOR / focusableElements / nextFocusIndex /
+ * decideModalKeydown）也在本文件内（自 kafkaModel 迁入，有单测）；组合式函数
+ * 只做 DOM 接线（与 MessagesPanel 抽屉 / ConnectionsPanel 主弹窗的已验证实现
+ * 同源）。层级语义照连接弹窗导入助手子弹层的捕获态参照：后打开的层在上，
+ * keydown 只由栈顶层响应——子弹层在场时 Esc 只关子弹层、不透传给下层
+ * （2→1→0 逐层关闭）。
  */
 import { nextTick, onBeforeUnmount, watch, type Ref } from "vue";
-import { decideModalKeydown, focusableElements } from "./kafkaModel";
 
 interface ModalLayer {
   open: () => boolean;
@@ -96,4 +97,42 @@ export function useModalBehavior(options: ModalBehaviorOptions): void {
     if (index >= 0) layerStack.splice(index, 1);
     window.removeEventListener("keydown", onKeydown);
   });
+}
+
+// -- 弹层焦点/keydown 决策纯逻辑（P1-2/P1-3；自 kafkaModel 迁入，有单测）--------
+
+/** 容器内可聚焦元素选择器（disabled / hidden input / tabindex=-1 除外）。 */
+export const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  'input:not([disabled]):not([type="hidden"])',
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(", ");
+
+/** 容器内文档顺序的可聚焦元素列表。 */
+export function focusableElements(root: ParentNode): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
+/** Tab 焦点陷阱回绕：无焦点/越界时按方向取首/尾，否则循环步进；空容器返回 -1。 */
+export function nextFocusIndex(count: number, currentIndex: number, shift: boolean): number {
+  if (count <= 0) return -1;
+  if (currentIndex < 0 || currentIndex >= count) return shift ? count - 1 : 0;
+  return (currentIndex + (shift ? -1 : 1) + count) % count;
+}
+
+/** 弹层 keydown 决策：Esc → close；Tab → focus 回绕目标下标；其余 → none。 */
+export type ModalKeydownDecision = { kind: "none" } | { kind: "close" } | { kind: "focus"; index: number };
+
+export function decideModalKeydown(
+  key: string,
+  shiftKey: boolean,
+  focusableCount: number,
+  currentIndex: number,
+): ModalKeydownDecision {
+  if (key === "Escape") return { kind: "close" };
+  if (key !== "Tab" || focusableCount <= 0) return { kind: "none" };
+  return { kind: "focus", index: nextFocusIndex(focusableCount, currentIndex, shiftKey) };
 }

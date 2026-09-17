@@ -3,7 +3,7 @@
 // 可折叠）。折叠态本地内存（不持久化——详情树随选中 schema 重建，记忆无意义）。
 import { computed, ref } from "vue";
 import { ChevronDown } from "@lucide/vue";
-import type { SchemaTreeNode } from "../lib/kafkaModel";
+import type { SchemaTreeNode } from "../lib/schemaTree";
 
 const props = defineProps<{
   node: SchemaTreeNode;

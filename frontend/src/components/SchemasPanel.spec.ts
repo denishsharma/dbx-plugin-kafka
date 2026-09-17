@@ -10,7 +10,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, type PropType } from "vue";
 import SchemasPanel from "./SchemasPanel.vue";
 import { setKafkaConnectionId, type SchemaSubject } from "../lib/api";
-import { SCHEMA_TEMPLATE_AVRO, SCHEMA_TEMPLATE_JSON, SCHEMA_TEMPLATE_PROTOBUF, schemaTemplateFor } from "../lib/kafkaModel";
+import { SCHEMA_TEMPLATE_AVRO, SCHEMA_TEMPLATE_JSON, SCHEMA_TEMPLATE_PROTOBUF, schemaTemplateFor } from "../lib/schemaTree";
 import { t } from "../lib/i18n";
 
 // DbxAgGrid stub：行渲染 + 把 columnDefs 里的行操作 cellRenderer 真正执行

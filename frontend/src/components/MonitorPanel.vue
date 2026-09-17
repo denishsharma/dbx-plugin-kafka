@@ -14,7 +14,7 @@ import {
   toLagRows,
   type LagVm,
 } from "../lib/kafkaColumns";
-import { sumLag } from "../lib/kafkaModel";
+import { sumLag } from "../lib/topics";
 import { t } from "../lib/i18n";
 
 const emit = defineEmits<{

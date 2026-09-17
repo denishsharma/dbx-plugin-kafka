@@ -23,7 +23,7 @@ import { bracketMatching, HighlightStyle, indentOnInput, syntaxHighlighting } fr
 import { json } from "@codemirror/lang-json";
 import { xml } from "@codemirror/lang-xml";
 import { tags as lezerTags } from "@lezer/highlight";
-import { jsonErrorLine } from "../lib/kafkaModel";
+import { jsonErrorLine } from "../lib/jsonText";
 import { t } from "../lib/i18n";
 
 const props = withDefaults(

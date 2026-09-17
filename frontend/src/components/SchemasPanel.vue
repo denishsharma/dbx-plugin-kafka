@@ -34,7 +34,8 @@ import {
   type SchemaVersionVm,
   type SubjectVm,
 } from "../lib/kafkaColumns";
-import { buildSchemaTree, prettyJson, schemaTemplateFor, type SchemaTreeNode } from "../lib/kafkaModel";
+import { prettyJson } from "../lib/messageCodec";
+import { buildSchemaTree, schemaTemplateFor, type SchemaTreeNode } from "../lib/schemaTree";
 import { useModalBehavior } from "../lib/modalBehavior";
 import { t } from "../lib/i18n";
 
