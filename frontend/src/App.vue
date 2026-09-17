@@ -312,6 +312,13 @@ function selectTopic(topic: string) {
   uiIntent.reportSnapshot({ panel: activePanel.value, topic: topic || undefined });
 }
 
+// 树快捷动作（对齐 Confluent IDE 右键打开 Producer/Consumer）：先保证 topic
+// 选中（selectTopic 内含快照上报），再切到对应面板（produce=生产 / messages=消费）。
+function openTopicPanel(topic: string, panel: PanelKey) {
+  if (selectedTopic.value !== topic) selectTopic(topic);
+  openPanel(panel);
+}
+
 // -- host bridge ------------------------------------------------------------------
 
 // -- stream 事件背压（大数据量专项）--------------------------------------------
@@ -484,6 +491,8 @@ onBeforeUnmount(() => {
           :selected-topic="selectedTopic"
           @refresh="loadTopics"
           @select="selectTopic"
+          @open-produce="(topic) => openTopicPanel(topic, 'produce')"
+          @open-consume="(topic) => openTopicPanel(topic, 'messages')"
         />
         <div class="divider" />
         <main class="main-pane">
