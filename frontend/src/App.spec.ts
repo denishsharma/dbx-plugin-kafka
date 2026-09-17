@@ -84,6 +84,20 @@ describe("App a11y live regions (P2-24)", () => {
   });
 });
 
+describe("App host font tokens (字体设置下发)", () => {
+  it("applies colors inline but leaves fonts to the host theme bridge", async () => {
+    const wrapper = await mountApp();
+    document.dispatchEvent(new CustomEvent("dbx-plugin-env", { detail: { theme: { appearance: "dark", tokens: { "--color-background": "rgb(1 2 3)" } } } }));
+    await flushPromises();
+    // 颜色仍由 applyAppearance 内联回写。
+    expect(document.documentElement.style.getPropertyValue("--background")).toBe("rgb(1 2 3)");
+    // 字体交给主题桥（--ui-font-family:var(--font-sans,…)）跟随宿主字体设置，
+    // 内联回写会压过桥接样式，把字体钉死在插件默认栈。
+    expect(document.documentElement.style.getPropertyValue("--ui-font-family")).toBe("");
+    wrapper.unmount();
+  });
+});
+
 describe("App context menu behavior", () => {
   it("suppresses the native context menu across the workbench", async () => {
     const wrapper = await mountApp();

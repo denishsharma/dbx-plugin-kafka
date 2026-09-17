@@ -257,7 +257,10 @@ function applyAppearance(next?: DbxPluginAppearanceInput | null) {
     else root.style.setProperty(name, resolved.colors[key]);
   }
   root.style.setProperty("--popover", DBX_POPOVER[resolved.colorScheme]);
-  root.style.setProperty("--ui-font-family", resolved.ui.fontFamily);
+  // 字体不在此内联回写：main.ts 安装的宿主令牌桥已把 --ui-font-family /
+  // --mono-font-family 声明为宿主 --font-sans / --font-mono 的 var() 引用，
+  // 内联样式会压过桥接样式，导致字体永远停留在插件默认栈。令牌缺失时
+  // （Host API 1.0 / mock）桥自身的回退值与原默认一致，行为不变。
 }
 
 function showNotice(message: string) {
