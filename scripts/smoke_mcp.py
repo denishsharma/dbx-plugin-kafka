@@ -58,6 +58,8 @@ import threading
 import time
 import uuid
 
+from pathlib import Path
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sidecar_client_jsonl import (  # noqa: E402
@@ -67,6 +69,7 @@ from sidecar_client_jsonl import (  # noqa: E402
     is_method_not_registered,
     lifecycle_params,
 )
+from smoke_test import _OPENER, _ensure_local_url  # noqa: E402
 
 HOST = os.environ.get("KAFKA_TEST_HOST", "127.0.0.1")
 PORT = int(os.environ.get("KAFKA_TEST_PORT", "9092"))
@@ -540,12 +543,16 @@ def sr_base_url() -> str:
 
 def schema_registry_reachable() -> tuple[bool, str]:
     import urllib.request
+    url = sr_base_url()
+    # 与 smoke_test 同款 SSRF 守卫：仅 http(s) 且解析到环回/私网才放行，
+    # 且不跟随重定向。
+    _ensure_local_url(url)
     try:
-        with urllib.request.urlopen(sr_base_url() + "/subjects", timeout=3) as resp:
+        with _OPENER.open(url + "/subjects", timeout=3) as resp:
             resp.read()
         return True, ""
     except OSError as cause:
-        return False, f"no Schema Registry at {sr_base_url()}: {cause}"
+        return False, f"no Schema Registry at {url}: {cause}"
 
 
 def sr_register_json_schema(subject: str) -> dict:
@@ -558,13 +565,15 @@ def sr_register_json_schema(subject: str) -> dict:
             "region": {"type": "string"},
         },
     })
+    url = f"{sr_base_url()}/subjects/{subject}/versions"
+    _ensure_local_url(url)
     request = urllib.request.Request(
-        f"{sr_base_url()}/subjects/{subject}/versions",
+        url,
         data=json.dumps({"schemaType": "JSON", "schema": schema}).encode(),
         method="POST",
     )
     request.add_header("Content-Type", "application/vnd.schemaregistry.v1+json")
-    with urllib.request.urlopen(request, timeout=10) as resp:
+    with _OPENER.open(request, timeout=10) as resp:
         return json.loads(resp.read().decode())
 
 
@@ -1239,7 +1248,7 @@ class MockBridge:
     be exercised without a real DBX.app.
     """
 
-    def __init__(self, app_data: str, status: int = 200, body: dict | None = None):
+    def __init__(self, status: int = 200, body: dict | None = None):
         self.requests: list[tuple[str, dict]] = []
         self.status = status
         self.body = body or {
@@ -1266,8 +1275,10 @@ class MockBridge:
 
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         port = self.server.server_address[1]
-        with open(os.path.join(app_data, "mcp-bridge-port"), "w", encoding="utf-8") as handle:
-            handle.write(str(port))
+        # app-data 目录由 mock 自建（tempfile），端口文件写入点不经过外部
+        # 参数；调用方经 self.app_data 注入 DBX_APP_DATA_DIR。
+        self.app_data = tempfile.mkdtemp(prefix="dbx-kafka-mockbridge-")
+        Path(self.app_data, "mcp-bridge-port").write_text(str(port), encoding="utf-8")
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
     def stop(self) -> None:
@@ -1298,11 +1309,10 @@ def k16_bridge_fallback() -> str:
     # 2) 桥存在（本地 mock 桥）：未池化 connectionId 转发宿主契约五字段
     #    （plugin_id=io.dbx.kafka），应用侧 MCP envelope 逐字透传为 stdio
     #    响应；本地池不被污染；timeoutSecs 字符串宽容折算 timeout_ms。
-    app_data = tempfile.mkdtemp(prefix="dbx-kafka-mcp-appdata-")
-    mock = MockBridge(app_data)
+    mock = MockBridge()
     client = McpStdioClient.start(
         default_binary(), tempfile.mkdtemp(prefix="dbx-kafka-mcp-stdio-"),
-        extra_env={"DBX_APP_DATA_DIR": app_data, "DBX_APP_LAUNCH_CMD": ":"},
+        extra_env={"DBX_APP_DATA_DIR": mock.app_data, "DBX_APP_LAUNCH_CMD": ":"},
     )
     try:
         client.request("initialize", {"protocolVersion": "2024-11-05"})
@@ -1322,12 +1332,11 @@ def k16_bridge_fallback() -> str:
         mock.stop()
 
     # 3) 桥 404（连接不存在/旧版应用）：错误带 "DBX app bridge returned HTTP"。
-    app_data = tempfile.mkdtemp(prefix="dbx-kafka-mcp-appdata-")
-    mock = MockBridge(app_data, status=404,
+    mock = MockBridge(status=404,
                       body={"error": "Connection with id 'ghost' not found"})
     client = McpStdioClient.start(
         default_binary(), tempfile.mkdtemp(prefix="dbx-kafka-mcp-stdio-"),
-        extra_env={"DBX_APP_DATA_DIR": app_data, "DBX_APP_LAUNCH_CMD": ":"},
+        extra_env={"DBX_APP_DATA_DIR": mock.app_data, "DBX_APP_LAUNCH_CMD": ":"},
     )
     try:
         client.request("initialize", {"protocolVersion": "2024-11-05"})

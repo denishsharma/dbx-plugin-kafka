@@ -99,13 +99,12 @@ func bridgePortAlive(appDataDir string) (int, bool) {
 	return port, true
 }
 
-// launchAppDBX 尽力拉起 DBX 应用（DBX_APP_LAUNCH_CMD 覆盖，否则 macOS
-// `open -a DBX.app`）；失败不致命——下面的端口文件轮询才是事实来源。
+// launchAppDBX 尽力拉起 DBX 应用（缺省 macOS `open -a DBX.app`）；失败不
+// 致命——下面的端口文件轮询才是事实来源。DBX_APP_LAUNCH_CMD 仅支持 ":"
+// 哨兵（跳过拉起，smoke/CI 用来避免 UI 弹出）；不透传任意命令到 exec，
+// env 值不构成命令注入面。
 func launchAppDBX() {
-	if cmd := strings.TrimSpace(os.Getenv("DBX_APP_LAUNCH_CMD")); cmd != "" {
-		if proc := exec.Command("sh", "-c", cmd); proc != nil {
-			_ = proc.Start()
-		}
+	if strings.TrimSpace(os.Getenv("DBX_APP_LAUNCH_CMD")) == ":" {
 		return
 	}
 	if proc := exec.Command("open", "-a", "DBX.app"); proc != nil {

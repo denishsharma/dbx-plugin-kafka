@@ -125,9 +125,9 @@ stdio 模式带「未注册 `connectionId` 自动转发运行中 DBX 应用本�
 - **fail-closed**：端口文件缺失/损坏/TCP 探测失败/HTTP 非 200 都立即返回
   可行动错误（带 `DBX app bridge` 失败原因 + 内联凭据出路：改传
   `brokers`/`securityProtocol`/`sasl*`/`schemaRegistry*` 或启动 DBX 应用），
-  不假死、不静默重拨。应用未起时先尽力拉起（`DBX_APP_LAUNCH_CMD` 覆盖，
-  缺省 `open -a DBX.app`）并每 500ms 轮询端口至多 30s（`ensure` 预算，
-  TCP 探测防陈旧端口）。
+  不假死、不静默重拨。应用未起时先尽力拉起（缺省 `open -a DBX.app`；
+  `DBX_APP_LAUNCH_CMD` 仅支持 `:` 哨兵跳过拉起，smoke/CI 用）并每 500ms
+  轮询端口至多 30s（`ensure` 预算，TCP 探测防陈旧端口）。
 - **两阶段写透传**：preview/confirm 全部在应用侧 sidecar 完成一次性与
   hash 绑定语义（本地 stdio 会话不参与，token 不跨侧通用）。
 - 测试：Go 单测 mock 桥（httptest，契约形状/envelope 透传/404 表面化/

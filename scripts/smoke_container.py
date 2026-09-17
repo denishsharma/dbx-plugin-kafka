@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import secrets
 import shutil
 import socket
 import ssl
@@ -69,7 +70,10 @@ SASL_READY_TIMEOUT_SECS = 180
 TLS_HOST = "127.0.0.1"
 TLS_PORT = 30092
 TLS_READY_TIMEOUT_SECS = 180
-TLS_STORE_PASSWORD = "dbx-smoke-store"
+# 丢弃型 TLS 密钥库口令：证书/密钥库每次 run 在新的 KAFKA_TEST_TLS_SECRETS_DIR
+# 里重新生成，口令随之随机生成（文件内部自洽，不跨 run 复用）；环境变量
+# 覆盖仅供手动调试 --keep 目录时固定取值。
+TLS_STORE_PASSWORD = os.environ.get("KAFKA_TEST_TLS_STORE_PASSWORD") or secrets.token_urlsafe(16)
 
 
 def sh(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:

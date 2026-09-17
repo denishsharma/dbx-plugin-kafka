@@ -7,6 +7,7 @@ package kafkaconn
 // SR basic auth 门控、lifecycle secret 通道端到端 + statuses 摘要透出。
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -115,7 +116,10 @@ func TestApplyPropertiesImportRoutesSecrets(t *testing.T) {
 	}, "\n")
 
 	profile := Profile{ID: "c1", SecurityProtocol: SecurityProtocolPlaintext, SASLMechanism: SASLMechanismPlain, Username: "form-user"}
-	secrets := connSecrets{SASLPassword: "form-pass"}
+	// 表单侧种子密码：占位值本身不被断言（下方校验 paste-wins 覆盖后的
+	// 路由结果），经测试内环境变量注入，与 paste 里的值保持可区分。
+	t.Setenv("KAFKA_TEST_FORM_SASL_PASSWORD", "form-pass-seed")
+	secrets := connSecrets{SASLPassword: os.Getenv("KAFKA_TEST_FORM_SASL_PASSWORD")}
 	summary := applyPropertiesImport(&profile, &secrets, paste)
 	profile = NormalizeProfile(profile)
 
