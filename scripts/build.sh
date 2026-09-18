@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build the Kafka plugin frontend and package a .dbxp for the current platform.
 # Frontend three-step (typecheck/test/build) is owned by this path; the Go
-# backend + manifest.json are owned by the backend path — packaging is
-# attempted only when manifest.json exists.
+# backend + manifest.json are owned by the backend path — packaging (CLI
+# resolution, sidecar identity injection, old-artifact cleanup) lives in
+# scripts/package.sh and runs only when manifest.json exists.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -18,16 +19,6 @@ pnpm --dir frontend typecheck
 pnpm --dir frontend test
 pnpm --dir frontend build
 
-echo "==> package .dbxp"
-unset DBX_PLUGIN_SDK_ROOT
-if ! command -v dbx-plugin >/dev/null 2>&1; then
-  HOST="${DBX_HOST_WORKTREE:-$PWD/../dbx-plugin-host-worktree}"
-  if [ ! -x "$HOST/plugins/sdk/cli/target/release/dbx-plugin" ]; then
-    (cd "$HOST/plugins/sdk/cli" && cargo build --release)
-  fi
-  export PATH="$HOST/plugins/sdk/cli/target/release:$PATH"
-fi
-
 if [ ! -f manifest.json ]; then
   echo "SKIP: manifest.json not present yet (backend path owns it); frontend artifacts are in ui/"
   exit 0
@@ -40,11 +31,12 @@ PLUGIN_VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' manifest.json | he
 PLUGIN_VERSION="${PLUGIN_VERSION:-0.0.0-dev}"
 
 # Build the Go sidecar first when the backend workspace is present.
-# backend/bin is for local smoke/debug; the packaging CLI rebuilds the sidecar
-# itself (build_go_backend runs plain `go build`, no ldflags support), so the
-# same version is injected into that rebuild via GOFLAGS below. The local
+# backend/bin is for local smoke/debug; scripts/package.sh lets the packaging
+# CLI rebuild the sidecar itself with the same version injected via GOFLAGS,
+# keeping the local output and the packaged sidecar on one version. The local
 # output keeps a Windows .exe suffix so the offline smoke can execute it on
 # every CI platform.
+unset DBX_PLUGIN_SDK_ROOT
 SIDECAR_BIN="bin/dbx-plugin-kafka"
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*) SIDECAR_BIN="bin/dbx-plugin-kafka.exe" ;;
@@ -56,19 +48,4 @@ if [ -f backend/go.mod ] && command -v go >/dev/null 2>&1; then
   }
 fi
 
-# The npm CLI wrapper injects DBX_PLUGIN_SDK_ROOT (bundled SDK ships a go.work
-# pinned to go 1.22, which breaks modules requiring >=1.25). Call the native
-# binary directly without SDK_ROOT so the local Go toolchain is used. The
-# platform package suffix is resolved per-machine (linux uses a -gnu suffix),
-# so cross-platform CI never falls back to the wrapper.
-. scripts/cli-platform.sh
-if NATIVE_CLI="$(resolve_native_plugin_cli)"; then
-  env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 GOFLAGS="-ldflags=-X=main.version=${PLUGIN_VERSION}" "$NATIVE_CLI" package .
-else
-  echo "WARN: native plugin-cli for $(uname -s)/$(uname -m) not found; falling back to the npm wrapper (its bundled SDK may conflict with backend go.mod)" >&2
-  env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 GOFLAGS="-ldflags=-X=main.version=${PLUGIN_VERSION}" dbx-plugin package .
-fi
-
-echo
-echo "Artifacts:"
-ls -la dist/*.dbxp dist/*.artifact.json 2>/dev/null || true
+scripts/package.sh

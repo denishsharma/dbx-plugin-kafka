@@ -33,24 +33,8 @@ else
   echo "==> backend unit tests skipped (no backend/go.mod or no go toolchain yet)"
 fi
 
-echo "==> package .dbxp (only when manifest.json exists)"
-if [ -f manifest.json ]; then
-  unset DBX_PLUGIN_SDK_ROOT
-  # Same native-CLI direct call as build.sh: the npm wrapper injects
-  # DBX_PLUGIN_SDK_ROOT whose bundled go.work is pinned to go 1.22 and breaks
-  # modules requiring >=1.25. Platform suffix resolved per-machine.
-  . scripts/cli-platform.sh
-  if NATIVE_CLI="$(resolve_native_plugin_cli)"; then
-    env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 "$NATIVE_CLI" package .
-  elif command -v dbx-plugin >/dev/null 2>&1; then
-    echo "WARN: native plugin-cli for $(uname -s)/$(uname -m) not found; falling back to the npm wrapper" >&2
-    env -u DBX_PLUGIN_SDK_ROOT NO_COLOR=1 dbx-plugin package .
-  else
-    echo "SKIP: dbx-plugin CLI not available"
-  fi
-else
-  echo "SKIP: manifest.json/dbx-plugin CLI not ready yet; frontend artifacts are in ui/"
-fi
+echo "==> package .dbxp (SKIP when manifest.json is absent)"
+scripts/package.sh
 
 echo "==> smoke (Kafka container auto-SKIP; unimplemented methods SKIP)"
 python3 scripts/smoke_test.py

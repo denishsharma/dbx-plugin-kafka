@@ -82,8 +82,13 @@ pnpm --dir frontend install
 pnpm --dir frontend typecheck && pnpm --dir frontend test && pnpm --dir frontend build
 (cd backend && go vet ./... && go test ./...)
 python3 scripts/validate_repo.py && node scripts/connection-forms/verify.mjs kafka
-scripts/test.sh
+scripts/test.sh        # 前端三步 + go 测试 + 打包（自动清理 dist/ 旧版本产物）+ 冒烟
+scripts/install.sh     # 用官方安装器把 dist/ 最新 .dbxp 装进 DBX 并重启（自动清理旧安装版本；--keep-old 保留回滚）
 ```
+
+打包阶段（`scripts/package.sh`，被 build/test 共用）只保留与 manifest.json 当前版本一致的
+`.dbxp`/`.artifact.json`，旧版本产物自动清理；安装阶段默认清理 `io.dbx.kafka` 的旧安装版本，
+需要回滚时用 `scripts/install.sh --keep-old`。
 
 本地 Kafka/Schema Registry 测试集群用 `scripts/dev-cluster.sh` 拉起（Docker）；
 MCP 离线冒烟用 `python3 scripts/smoke_mcp.py`（容器类用例在环境不可用时诚实 SKIP）。

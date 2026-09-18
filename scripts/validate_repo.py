@@ -65,6 +65,8 @@ def main() -> int:
         "backend/go.mod",
         "scripts/test.sh",
         "scripts/build.sh",
+        "scripts/package.sh",
+        "scripts/install.sh",
         "scripts/cli-platform.sh",
         "scripts/smoke_mcp.py",
         "scripts/check_candidates.py",
