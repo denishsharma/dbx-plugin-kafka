@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/twmb/franz-go/pkg/kgo"
+
 	"io.dbx.kafka.plugin/internal/lifecycle"
 )
 
@@ -104,6 +106,42 @@ func TestTestDiagSummaryLine(t *testing.T) {
 
 // TestTestDiagDialerStages 验证探针拨号记录 TCP 阶段并在 TLS 配置存在时
 // 完成握手（127.0.0.1:1 拒连 → tcp 阶段带 err；探针落入摘要）。
+// TestProbeDialerOptsPassKgoValidation 是 S17 集成矩阵的回归测试：探针路径
+// 组装的 opts 追加 kgo.Dialer 后必须仍能通过 kgo 校验（DialTLSConfig 已被
+// 省略），TLS 配置交由探针拨号器使用；常规路径再叠 Dialer 则必须被拒绝。
+func TestProbeDialerOptsPassKgoValidation(t *testing.T) {
+	entry := &connEntry{
+		profile: Profile{
+			ID:               "c1",
+			BootstrapServers: []string{"k1:9092"},
+			SecurityProtocol: SecurityProtocolSSL,
+		},
+	}
+
+	probeOpts, probeTLS, err := entry.buildClientOptsWithSeeds(entry.profile.BootstrapServers, true)
+	if err != nil {
+		t.Fatalf("probe opts error = %v", err)
+	}
+	if probeTLS == nil {
+		t.Fatal("probe path must return the tls config for the probe dialer")
+	}
+	probeOpts = append(probeOpts, kgo.Dialer(newTestDiag(nil).dialer(probeTLS)))
+	probeClient, err := kgo.NewClient(probeOpts...)
+	if err != nil {
+		t.Fatalf("probe opts + Dialer rejected by kgo: %v", err)
+	}
+	probeClient.Close()
+
+	baseOpts, _, err := entry.buildClientOptsWithSeeds(entry.profile.BootstrapServers, false)
+	if err != nil {
+		t.Fatalf("base opts error = %v", err)
+	}
+	baseOpts = append(baseOpts, kgo.Dialer(newTestDiag(nil).dialer(probeTLS)))
+	if _, err := kgo.NewClient(baseOpts...); err == nil || !strings.Contains(err.Error(), "cannot set both Dialer and DialTLSConfig") {
+		t.Errorf("expected kgo to reject Dialer + DialTLSConfig, got %v", err)
+	}
+}
+
 func TestTestDiagDialerStages(t *testing.T) {
 	diag := newTestDiag(&bytes.Buffer{})
 	dial := diag.dialer(nil)

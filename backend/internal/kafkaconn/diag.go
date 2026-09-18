@@ -66,8 +66,9 @@ func newTestDiag(sink io.Writer) *testDiag {
 }
 
 // dialer 返回带探针的拨号器。tlsConfig 非 nil 时由拨号器自行完成 TLS 握手：
-// kgo 仅在 dialFn 为空时才应用 DialTLSConfig（client.go validateCfg），设置
-// 自定义拨号器后必须把 TLS 一起包进去，否则静默降级为明文。TLS 语义对齐
+// kgo 校验拒绝 Dialer 与 DialTLSConfig 并存（config.go validate），探针路径
+// 组装 opts 时已省略 DialTLSConfig（buildClientOptsWithSeeds 的
+// withProbeDialer），TLS 必须在这里包进去，否则静默降级为明文。TLS 语义对齐
 // kgo 内置路径（Clone config；ServerName 为空时由拨号地址推导 SNI）。
 // 代理路由（runtimeProxyDialer）自带 TLS 包装，不走本探针，仅记录摘要。
 func (d *testDiag) dialer(tlsConfig *tls.Config) func(context.Context, string, string) (net.Conn, error) {

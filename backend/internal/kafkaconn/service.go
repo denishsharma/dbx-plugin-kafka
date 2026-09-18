@@ -127,7 +127,7 @@ func (s *Service) Test(ctx context.Context, params *lifecycle.Params) (string, e
 		}
 		seeds = resolved
 	}
-	opts, tlsConfig, err := entry.buildClientOptsWithSeeds(seeds)
+	opts, tlsConfig, err := entry.buildClientOptsWithSeeds(seeds, true)
 	if err != nil {
 		return "", err
 	}

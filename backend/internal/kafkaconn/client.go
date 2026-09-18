@@ -169,15 +169,19 @@ func (e *connEntry) buildClientOpts(extraOpts ...kgo.Opt) ([]kgo.Opt, error) {
 	if len(seeds) == 0 {
 		return nil, errf("bootstrap servers or runtime endpoint is required")
 	}
-	opts, _, err := e.buildClientOptsWithSeeds(seeds, extraOpts...)
+	opts, _, err := e.buildClientOptsWithSeeds(seeds, false, extraOpts...)
 	return opts, err
 }
 
 // buildClientOptsWithSeeds 以给定种子组装 kgo opts（connection/test 的 ZK
 // 模式与常规路径共用 TLS/SASL 组装）。第二个返回值是生效的 TLS 配置（未启用
-// TLS 时为 nil）：connection/test 的探针拨号器需要它自行完成 TLS 握手
-// （kgo 仅在 dialFn 为空时才应用 DialTLSConfig，见 diag.go 注释）。
-func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Opt) ([]kgo.Opt, *tls.Config, error) {
+// TLS 时为 nil）。
+//
+// withProbeDialer 标记调用方随后会追加自己的探针拨号器（connection/test）：
+// 此时不得再追加 kgo.DialTLSConfig——kgo 校验拒绝 Dialer 与 DialTLSConfig
+// 并存（config.go validate），TLS 改由探针拨号器按返回的 tlsConfig 自行完成
+// （语义对齐内置路径：Clone config，ServerName 为空时由拨号地址推导 SNI）。
+func (e *connEntry) buildClientOptsWithSeeds(seeds []string, withProbeDialer bool, extraOpts ...kgo.Opt) ([]kgo.Opt, *tls.Config, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(seeds...),
 		// 默认生产者参数对 admin/consume 无影响；关闭 kgo 默认的自动
@@ -202,7 +206,7 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 				tlsConfig.ServerName = host
 			}
 		}
-		if e.target.Proxy == nil {
+		if e.target.Proxy == nil && !withProbeDialer {
 			opts = append(opts, kgo.DialTLSConfig(tlsConfig))
 		}
 	}
