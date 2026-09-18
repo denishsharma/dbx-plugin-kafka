@@ -6,6 +6,7 @@ package kafkaconn
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	kconfig "github.com/jcmturner/gokrb5/v8/config"
+	"github.com/twmb/franz-go/pkg/sasl"
 )
 
 // writeTestKeytab 按 MIT keytab v2 格式合成一个只含单条目的 keytab 文件。
@@ -242,5 +244,120 @@ func TestBuildSASLOptGSSAPI(t *testing.T) {
 	}
 	if opt == nil {
 		t.Fatal("buildSASLOpt(GSSAPI) = nil")
+	}
+}
+
+// fakeKerberosResolver 记录反查调用并按表返回 PTR（issue #26 单测替身）。
+type fakeKerberosResolver struct {
+	calls []string
+	names map[string][]string
+	err   error
+}
+
+func (r *fakeKerberosResolver) LookupAddr(_ context.Context, addr string) ([]string, error) {
+	r.calls = append(r.calls, addr)
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.names[addr], nil
+}
+
+func TestCanonicalizeKerberosAuthHost(t *testing.T) {
+	// 域名地址原样返回，且不触发反查（Java getHostName 语义：hostname
+	// 已知时直接返回，不做 reverse lookup）。
+	res := &fakeKerberosResolver{names: map[string][]string{}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "broker.example.com:21007", res); got != "broker.example.com:21007" {
+		t.Errorf("domain = %q", got)
+	}
+	if len(res.calls) != 0 {
+		t.Errorf("domain triggered lookups: %v", res.calls)
+	}
+
+	// IP 字面量反解为 PTR 域名并保留端口（issue #26 主场景：KDC 只有
+	// kafka/<域名>，认证主体不能是 kafka/<IP>）。
+	res = &fakeKerberosResolver{names: map[string][]string{"10.0.0.5": {"broker.example.com"}}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "10.0.0.5:21007", res); got != "broker.example.com:21007" {
+		t.Errorf("ip = %q, want broker.example.com:21007", got)
+	}
+	if len(res.calls) != 1 || res.calls[0] != "10.0.0.5" {
+		t.Errorf("calls = %v", res.calls)
+	}
+
+	// PTR 常带尾点，须去除。
+	res = &fakeKerberosResolver{names: map[string][]string{"10.0.0.5": {"broker.example.com."}}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "10.0.0.5:21007", res); got != "broker.example.com:21007" {
+		t.Errorf("trailing dot = %q", got)
+	}
+
+	// 反查失败/无 PTR → 回退原地址（与 Java 一致，不阻断认证路径）。
+	res = &fakeKerberosResolver{err: context.DeadlineExceeded}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "10.0.0.5:21007", res); got != "10.0.0.5:21007" {
+		t.Errorf("lookup error fallback = %q", got)
+	}
+	res = &fakeKerberosResolver{names: map[string][]string{"10.0.0.5": {}}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "10.0.0.5:21007", res); got != "10.0.0.5:21007" {
+		t.Errorf("empty PTR fallback = %q", got)
+	}
+
+	// 无端口形式：反解后同样不带端口。
+	res = &fakeKerberosResolver{names: map[string][]string{"10.0.0.5": {"broker.example.com"}}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "10.0.0.5", res); got != "broker.example.com" {
+		t.Errorf("no port = %q", got)
+	}
+
+	// IPv6 括号形式：SplitHostPort/JoinHostPort 成对处理（域名结果不带括号）。
+	res = &fakeKerberosResolver{names: map[string][]string{"fd00::5": {"broker.example.com"}}}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "[fd00::5]:9092", res); got != "broker.example.com:9092" {
+		t.Errorf("ipv6 = %q", got)
+	}
+
+	// 畸形形状（多冒号）原样返回，不反查。
+	res = &fakeKerberosResolver{}
+	if got := canonicalizeKerberosAuthHost(context.Background(), "host:port:extra", res); got != "host:port:extra" {
+		t.Errorf("malformed = %q", got)
+	}
+	if len(res.calls) != 0 {
+		t.Errorf("malformed triggered lookups: %v", res.calls)
+	}
+}
+
+// recordingMechanism 记录转发给内层机制的 host:port（Close 转发验证）。
+type recordingMechanism struct {
+	hosts  []string
+	closed bool
+}
+
+func (m *recordingMechanism) Name() string { return "GSSAPI" }
+
+func (m *recordingMechanism) Authenticate(_ context.Context, host string) (sasl.Session, []byte, error) {
+	m.hosts = append(m.hosts, host)
+	return nil, []byte("client-first"), nil
+}
+
+func (m *recordingMechanism) Close() { m.closed = true }
+
+func TestCanonicalKerberosMechanism(t *testing.T) {
+	inner := &recordingMechanism{}
+	res := &fakeKerberosResolver{names: map[string][]string{"10.0.0.5": {"broker.example.com"}}}
+	mech := &canonicalKerberosMechanism{inner: inner, resolver: res}
+
+	if mech.Name() != "GSSAPI" {
+		t.Errorf("Name = %q", mech.Name())
+	}
+	_, write, err := mech.Authenticate(context.Background(), "10.0.0.5:21007")
+	if err != nil {
+		t.Fatalf("Authenticate error = %v", err)
+	}
+	if string(write) != "client-first" {
+		t.Errorf("write = %q", write)
+	}
+	if len(inner.hosts) != 1 || inner.hosts[0] != "broker.example.com:21007" {
+		t.Errorf("inner hosts = %v, want [broker.example.com:21007]", inner.hosts)
+	}
+
+	// Close 转发给实现了 ClosingMechanism 的内层（franz *closing → Destroy）。
+	mech.Close()
+	if !inner.closed {
+		t.Error("inner Close not forwarded")
 	}
 }
