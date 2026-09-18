@@ -169,12 +169,15 @@ func (e *connEntry) buildClientOpts(extraOpts ...kgo.Opt) ([]kgo.Opt, error) {
 	if len(seeds) == 0 {
 		return nil, errf("bootstrap servers or runtime endpoint is required")
 	}
-	return e.buildClientOptsWithSeeds(seeds, extraOpts...)
+	opts, _, err := e.buildClientOptsWithSeeds(seeds, extraOpts...)
+	return opts, err
 }
 
 // buildClientOptsWithSeeds 以给定种子组装 kgo opts（connection/test 的 ZK
-// 模式与常规路径共用 TLS/SASL 组装）。
-func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Opt) ([]kgo.Opt, error) {
+// 模式与常规路径共用 TLS/SASL 组装）。第二个返回值是生效的 TLS 配置（未启用
+// TLS 时为 nil）：connection/test 的探针拨号器需要它自行完成 TLS 握手
+// （kgo 仅在 dialFn 为空时才应用 DialTLSConfig，见 diag.go 注释）。
+func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Opt) ([]kgo.Opt, *tls.Config, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(seeds...),
 		// 默认生产者参数对 admin/consume 无影响；关闭 kgo 默认的自动
@@ -185,10 +188,11 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 
 	var tlsConfig *tls.Config
 	if e.profile.hasTLS() {
-		tlsConfig, err := buildTLSConfig(e.profile, e.secrets)
+		built, err := buildTLSConfig(e.profile, e.secrets)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		tlsConfig = built
 		// When Host hands us a local forward endpoint, preserve the logical
 		// broker name for certificate verification instead of using 127.0.0.1.
 		// A structured proxy route leaves ServerName empty here so the custom
@@ -206,7 +210,7 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 	if e.profile.hasSASL() {
 		saslOpt, err := buildSASLOpt(e.profile, e.secrets)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		opts = append(opts, saslOpt)
 	}
@@ -214,13 +218,13 @@ func (e *connEntry) buildClientOptsWithSeeds(seeds []string, extraOpts ...kgo.Op
 	if e.target.Proxy != nil {
 		dial, err := e.runtimeProxyDialer(tlsConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		opts = append(opts, kgo.Dialer(dial))
 	}
 
 	opts = append(opts, extraOpts...)
-	return opts, nil
+	return opts, tlsConfig, nil
 }
 
 // runtimeProxyDialer creates the one dialer shared by every franz-go client
