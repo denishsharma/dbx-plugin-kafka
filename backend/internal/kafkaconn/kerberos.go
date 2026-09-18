@@ -15,13 +15,16 @@ package kafkaconn
 // krb5.conf 回落、合成 keytab + krb5.conf 下机制可构建）——不发起认证。
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
 	"github.com/jcmturner/gokrb5/v8/client"
 	"github.com/jcmturner/gokrb5/v8/config"
 	"github.com/jcmturner/gokrb5/v8/keytab"
+	"github.com/twmb/franz-go/pkg/sasl"
 	franzkerberos "github.com/twmb/franz-go/pkg/sasl/kerberos"
 )
 
@@ -141,4 +144,57 @@ func buildKerberosSASLMechanism(params kerberosParams) (franzkerberos.Auth, erro
 		Service:          params.ServiceName,
 		PersistAfterAuth: true,
 	}, nil
+}
+
+// kerberosPTRResolver 反查接口（*net.Resolver 满足；单测注入替身）。
+type kerberosPTRResolver interface {
+	LookupAddr(ctx context.Context, addr string) ([]string, error)
+}
+
+// canonicalizeKerberosAuthHost 把 host:port 中的 IP 字面量反解为认证域名，
+// 对齐 Java 客户端 SaslChannelBuilder 的 getHostName 语义（issue #26：KDC
+// 服务主体是 kafka/<域名>，而 franz-go 直接用拨号地址拼 kafka/<host>——
+// runtime 兜底端点或 metadata 广告 IP 时主体变成 kafka/<IP>，认证失败）。
+// 域名地址原样返回（不发起反查）；反查失败/无 PTR 回退原地址，不阻断认证。
+func canonicalizeKerberosAuthHost(ctx context.Context, addr string, resolver kerberosPTRResolver) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		// 无端口或形状异常：整段按 host 处理（IPv6 裸形式在此分支）。
+		host = strings.Trim(addr, "[]")
+	}
+	if net.ParseIP(host) == nil {
+		return addr
+	}
+	names, err := resolver.LookupAddr(ctx, host)
+	if err != nil || len(names) == 0 {
+		return addr
+	}
+	name := strings.TrimSuffix(strings.TrimSpace(names[0]), ".")
+	if name == "" {
+		return addr
+	}
+	if port == "" {
+		return name
+	}
+	return net.JoinHostPort(name, port)
+}
+
+// canonicalKerberosMechanism 包装 franz-go GSSAPI 机制，在请求服务票据前
+// 规范化认证 host（仅改主体名，不改变拨号地址）。Close 透传给内层的
+// ClosingMechanism（franz *closing → client.Destroy）。
+type canonicalKerberosMechanism struct {
+	inner    sasl.Mechanism
+	resolver kerberosPTRResolver
+}
+
+func (m *canonicalKerberosMechanism) Name() string { return m.inner.Name() }
+
+func (m *canonicalKerberosMechanism) Authenticate(ctx context.Context, host string) (sasl.Session, []byte, error) {
+	return m.inner.Authenticate(ctx, canonicalizeKerberosAuthHost(ctx, host, m.resolver))
+}
+
+func (m *canonicalKerberosMechanism) Close() {
+	if closer, ok := m.inner.(sasl.ClosingMechanism); ok {
+		closer.Close()
+	}
 }

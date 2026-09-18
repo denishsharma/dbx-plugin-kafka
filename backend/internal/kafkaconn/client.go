@@ -381,7 +381,13 @@ func buildSASLOpt(profile Profile, secrets connSecrets) (kgo.Opt, error) {
 		if err != nil {
 			return nil, err
 		}
-		return kgo.SASL(auth.AsMechanismWithClose()), nil
+		// issue #26：kgo 把拨号地址直接传给 GSSAPI 机制，runtime 兜底端点
+		// 或 metadata 广告 IP 会让服务主体变成 kafka/<IP>；包装一层按 Java
+		// getHostName 语义反解为域名（失败回退原地址）。
+		return kgo.SASL(&canonicalKerberosMechanism{
+			inner:    auth.AsMechanismWithClose(),
+			resolver: net.DefaultResolver,
+		}), nil
 	case SASLMechanismOAUTHBEARER:
 		// OAUTHBEARER（Phase 3 §12.2.3）：token provider 按来源构造
 		// （msk_iam 签名在拨号时按会话调用，构造期不触网）。
