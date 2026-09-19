@@ -303,3 +303,35 @@ func TestNormalizeProfileDefaults(t *testing.T) {
 		t.Error("SSL protocol flags wrong")
 	}
 }
+
+func TestStripBootstrapScheme(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"SSL://broker:9093", "broker:9093"},
+		{"ssl://broker:9093", "broker:9093"},
+		{"SASL_SSL://broker:9094", "broker:9094"},
+		{"SASL_PLAINTEXT://broker:9092", "broker:9092"},
+		{"PLAINTEXT://broker:9092", "broker:9092"},
+		{"plaintext://broker:9092", "broker:9092"},
+		{"broker:9092", "broker:9092"},
+		// trim 由 NormalizeProfile 先行完成；本函数只处理 scheme 前缀。
+		{"broker:9092 ", "broker:9092 "},
+		// 未知 scheme 不剥（不做隐式推导，保留原样便于用户发现配置问题）。
+		{"https://broker:8080", "https://broker:8080"},
+	}
+	for _, c := range cases {
+		if got := stripBootstrapScheme(c.in); got != c.want {
+			t.Errorf("stripBootstrapScheme(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestNormalizeProfileStripsBootstrapScheme(t *testing.T) {
+	profile := NormalizeProfile(Profile{
+		ID:               "c1",
+		BootstrapServers: []string{"SSL://k1:9093", "k2:9092", "", "SASL_SSL://k3:9094"},
+	})
+	got := strings.Join(profile.BootstrapServers, ",")
+	if got != "k1:9093,k2:9092,k3:9094" {
+		t.Errorf("bootstrap after normalize = %q", got)
+	}
+}

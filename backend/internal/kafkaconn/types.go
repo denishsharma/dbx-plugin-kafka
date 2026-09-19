@@ -16,6 +16,7 @@ package kafkaconn
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -259,7 +260,7 @@ func NormalizeProfile(p Profile) Profile {
 		if server == "" {
 			continue
 		}
-		servers = append(servers, server)
+		servers = append(servers, stripBootstrapScheme(server))
 	}
 	p.BootstrapServers = servers
 	zkServers := make([]string, 0, len(p.ZKServers))
@@ -272,6 +273,21 @@ func NormalizeProfile(p Profile) Profile {
 	}
 	p.ZKServers = zkServers
 	return p
+}
+
+// bootstrapSchemePrefixRe 匹配 server.properties listeners 风格的 scheme
+// 前缀（PLAINTEXT:// SSL:// SASL_PLAINTEXT:// SASL_SSL://，大小写不敏感）。
+// kgo 解析 seed 时不剥 scheme，会把 "SSL" 当主机名参与 DNS 解析（表现为
+// no such host 或超时，issue #28 排查面）；这里只剥离已知安全协议前缀，
+// scheme 与 security_protocol 是两个独立配置面，不做隐式推导。
+var bootstrapSchemePrefixRe = regexp.MustCompile(`(?i)^(?:plaintext|sasl_plaintext|ssl|sasl_ssl)://`)
+
+// stripBootstrapScheme 剥离单条 bootstrap 地址的 scheme 前缀。
+func stripBootstrapScheme(server string) string {
+	if prefix := bootstrapSchemePrefixRe.FindString(server); prefix != "" {
+		return strings.TrimSpace(server[len(prefix):])
+	}
+	return server
 }
 
 // hasSASL 报告安全协议是否含 SASL。

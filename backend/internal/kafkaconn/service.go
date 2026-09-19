@@ -11,6 +11,7 @@ package kafkaconn
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +48,13 @@ type Service struct {
 
 	// Streams 提供流式会话管理（stream.go；NewService 时初始化）。
 	Streams *StreamRegistry
+
+	// testDiagSink 覆盖 connection/test 诊断输出目标（nil → stderr；单测
+	// 注入 buffer 断言脱敏摘要）。见 diag.go。
+	testDiagSink io.Writer
+	// testTimeout 覆盖 connection/test 总预算（0 → defaultTestTimeout；仅
+	// 单测注入短超时，生产恒走默认）。
+	testTimeout time.Duration
 }
 
 // NewService 创建空连接表。
@@ -92,6 +100,12 @@ func (s *Service) Connect(params *lifecycle.Params) error {
 
 // Test 处理 connection/test：立即拨号 + ListBrokers 真实 metadata 探活；
 // 成功返回描述 message。不缓存连接、不残留状态（§5.1）。
+//
+// 诊断与超时（issue #28）：总预算 defaultTestTimeout（小于宿主默认 10s，
+// 让 sidecar 的精确错误先返回）；单请求 deadline 放宽到 testRequestOverhead
+// （TCP+TLS+SASL+metadata 全程共用）。失败/成功均输出一行脱敏摘要到
+// testDiagSink，franz-go 内部 WARN（拨号地址、SASL 认证错误等）同 sink；
+// 失败时返回值附带拨号目标与协议面摘要（%w 保留原始错误供前端分类）。
 func (s *Service) Test(ctx context.Context, params *lifecycle.Params) (string, error) {
 	profile, secrets, err := NewProfileFromLifecycle(params)
 	if err != nil {
@@ -104,24 +118,39 @@ func (s *Service) Test(ctx context.Context, params *lifecycle.Params) (string, e
 		status:  "idle",
 	}
 
-	opts, err := func() ([]kgo.Opt, error) {
-		if entry.profile.ConnectionSource == ConnectionSourceZookeeper {
-			// zookeeper 源：先经 ZK 发现 broker，作为探活拨号种子
-			//（ZK 不可达 → 业务错，语义与 brokers/list 一致）。
-			seeds, seedErr := zkSeedsForTest(entry.profile)
-			if seedErr != nil {
-				return nil, seedErr
-			}
-			return entry.buildClientOptsWithSeeds(seeds)
+	// 解析实际拨号种子（ZK 源先经 ZK 发现；语义与 brokers/list 一致）。
+	seeds := entry.seedBrokers()
+	if entry.profile.ConnectionSource == ConnectionSourceZookeeper {
+		resolved, seedErr := zkSeedsForTest(entry.profile)
+		if seedErr != nil {
+			return "", seedErr
 		}
-		return entry.buildClientOpts()
-	}()
+		seeds = resolved
+	}
+	opts, tlsConfig, err := entry.buildClientOptsWithSeeds(seeds, true)
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+
+	timeout := s.testTimeout
+	if timeout <= 0 {
+		timeout = defaultTestTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	diag := newTestDiag(s.testDiagSink)
+	opts = append(opts,
+		kgo.RequestTimeoutOverhead(testRequestOverhead),
+		kgoTestLogger(diag.sink),
+	)
+	// 代理路由保留既有 runtime SOCKS5 拨号器（自带 TLS 包装）；直连时由
+	// 探针拨号器接管 TCP/TLS 分阶段计时（含自行完成 TLS，见 dialer 注释）。
+	if entry.target.Proxy == nil {
+		opts = append(opts, kgo.Dialer(diag.dialer(tlsConfig)))
+	}
+
+	start := time.Now()
 	client, err := kgo.NewClient(opts...)
 	if err != nil {
 		return "", err
@@ -130,9 +159,23 @@ func (s *Service) Test(ctx context.Context, params *lifecycle.Params) (string, e
 
 	admin := kadm.NewClient(client)
 	brokers, err := admin.ListBrokers(ctx)
-	if err != nil {
-		return "", err
+	elapsed := time.Since(start)
+	summary := testDiagSummary{
+		seeds:      seeds,
+		seedSource: seedSourceLabel(entry),
+		profile:    profile,
+		elapsed:    elapsed,
 	}
+	if err != nil {
+		summary.status = "failed"
+		summary.err = err.Error()
+		diag.emit(summary)
+		return "", fmt.Errorf("connect to %s failed after %s (%s): %w",
+			strings.Join(seeds, ","), elapsed.Round(time.Millisecond), securitySummary(profile), err)
+	}
+	summary.status = "ok"
+	summary.brokers = len(brokers)
+	diag.emit(summary)
 	message := fmt.Sprintf("connected to %s (%d broker(s), protocol=%s)",
 		strings.Join(profile.BootstrapServers, ","), len(brokers), profile.SecurityProtocol)
 	return message, nil
