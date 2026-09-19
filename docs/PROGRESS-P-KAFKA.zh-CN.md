@@ -1691,3 +1691,27 @@ MCP 专项收口轮：第七轮代码之后对在跑 dev 集群（127.0.0.1:9092
   集群组合下无回归，第七轮记录的 dev 集群数据（K1–K19 全 PASS）本轮
   复现成立。本插件无独立性能脚本，不做基线采集（digest 扫描/翻页由
   K15/K18 断言覆盖正确性面）。
+
+## 测试覆盖续轮：组合式函数专测（2026-09-20）
+
+- **`useConsumeForm.spec.ts` 新增（29 用例，此前 490 行组合式无专属 spec，
+  51.8% 覆盖）**：buildParams 全分支——groupId×partitions 互斥兜底锁定
+  「双填时 partitions 优先、groupId 落选」（此前误读为两侧都丢）；commit
+  互斥短路；过滤通道 + fieldFilters 仅「启用且有值」上送（gt+非法数值行
+  仅 UI 标红仍上送，行为锁定）；timestamp/offset 策略与时间、offset 范围；
+  schema 挂载（version 非法省略、glue provider watch 复位开关——computed
+  依赖必须 ref 承载，闭包变量驱动不了重算）。开合记忆（msgFormOpen/
+  msgFilters 落盘与损坏 JSON 回退，watch 异步需 nextTick）；摘要 chips；
+  时间双模式换算；fieldFilters 行校验；预设 load/save/apply/remove 全
+  矩阵（含 monitor 型过滤、空名不发请求、桥错误走 error 回调）。
+- **行为锁定**：applyPreset 先设 version 再设 subject，subject watch 会把
+  schemaVersionText 复位（subjects 未加载时预设版本号被清、format 保留）。
+  如需保留预设版本号须调整 applyPreset 写入顺序，登记不实施。
+- **`useMessageDetailDrawer.spec.ts` 新增（8 用例，65.2%）**：格式探测
+  （XML/JSON/raw）、打开视图重置、headers 表格/JSON 双视图与关闭复位、
+  renderView 手动切换重渲染、Esc 关闭焦点归还触发元素、Tab 双向回绕、
+  更高层弹窗（modal-backdrop）在场让位。焦点断言前提：mount 须
+  `attachTo: document.body`（modalBehavior.spec 同款）。
+- **验证**：`vue-tsc --noEmit` 0 错；38 文件 337 用例全绿（基线 36 文件
+  300 用例）；`vite build` 通过（chunk warning 为既有现象）。纯测试改动，
+  零组件/协议变更。

@@ -766,3 +766,38 @@ client 接口抽象（超出本轮"不重构"约束，登记不实施）。
 - **验证**：mock 实测 evaluate 量高——valueBody 448px、编辑器 402px
   flex=1 1 auto 拉伸到底，截图确认；typecheck + 225 单测全绿；smoke all
   green（PASS=11 FAIL=0 SKIP=4）；打包 io.dbx.kafka-0.1.22。
+
+## 17. 代理路由传输层测试 + main 接线层离线测试（2026-09-20）
+
+- **背景**：DBX 宿主 structured proxy route（runtime.proxy，SOCKS5）此前只有
+  种子保留 / 类型校验 / 诊断标签 3 个浅层断言，传输行为无任何实拨验证；
+  main.go 接线层（MCP 轮新增的根包）自上次覆盖轮后完全无测试（0.7%）。
+- **新增 `internal/kafkaconn/proxy_test.go`（9 用例）**：内嵌迷你 SOCKS5
+  服务器（RFC 1928 + 可选 RFC 1929 认证，CONNECT 地址回显记录 + 可固定
+  转发）做端到端实拨——明文路由回环实拨（CONNECT 地址逐字透传）、
+  用户名/密码认证正误两向、TLS 包装 + SNI 按拨号地址推导（服务端
+  ConnectionState 断言 `db-broker.internal`，域名形态 CONNECT 不预解析）、
+  kgo 选项互斥回归（代理路由下 Dialer/DialTLSConfig 不得并存，连接测试
+  探针路径同查，即 issue #28 修复的代理侧护栏）、seedBrokers 优先级补遗
+  （代理+无 bootstrap→runtime 端点；直连时 runtime 优先 bootstrap）、
+  computeFingerprint 代理敏感（换代理或凭据轮换必换指纹→失效重建）、
+  lifecycle 解析 runtime.proxy 回环。
+- **新增 `wiring_test.go`（根包 0.7%→61.9%，全仓 68.9%→74.2%）**：Handle
+  全方法分派矩阵（每方法 `{}` 门禁错误码逐一断言 + 未知方法 -32601）、
+  离线成功链（connect→statuses→disconnect、presets 增删改查、mcp/tools、
+  settings 白名单边界、mcp/call 成功信封与四类拒绝、ui/state/report 快照
+  与 intent 拒绝、stream stop-all 与未知 session）、审计落盘 + kafka/audit
+  事件双通道断言、Stream Emitter 适配（nil no-op / 实发事件 / writer 故障
+  只记日志；SDK Emitter 经 Server.Serve 真实分发捕获，不触私有字段）。
+- **烟测 S18**（scripts/smoke_test.py）：进程内 SOCKS5 double + 宿主形态
+  `lifecycle_params(runtime_extra)`（模拟宿主注入 runtime.proxy）——明文
+  路由 connection/test + topics/list 数据路径过隧道、认证强制与错误凭据
+  拒绝（服务端 rejected_auth 断言）、不可达代理快速失败、http 类型参数级
+  拒绝。全量 `total=18 PASS=14 FAIL=0 SKIP=4`（SKIP 均设计内/既有观察：
+  S3 internal-flag 竞态、S12 Glue、S14 redpanda FDSet、S15 MSK）；
+  smoke_mcp 19/19 全绿。
+- **观察登记（不实施）**：zookeeper 连接源 + 代理路由组合时，ZK 发现拨号
+  不经代理（`zkSeedsForTest` 直连），broker 拨号仍走代理；如需支持须先
+  设计讨论。
+- **验证**：`go vet` / `go test ./... -count=1` 全绿（kafkaconn 217 用例、
+  根包 11 用例）；打包链路 `scripts/build.sh` 复跑通过。
