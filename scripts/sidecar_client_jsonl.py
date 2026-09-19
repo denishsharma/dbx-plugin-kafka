@@ -275,22 +275,26 @@ class SidecarClient:
             self.process.kill()
 
 
-def lifecycle_params(connection: dict) -> dict:
+def lifecycle_params(connection: dict, runtime_extra: dict | None = None) -> dict:
     """Build connection lifecycle params the way the DBX host does.
 
     binding 落点：config → connection.external_config.<field>，secret →
     connection.connection_secrets.<field>（M0 §3.1）。Kafka 的 manifest
     没有 host/port 绑定字段（只有 bootstrap_servers → config），runtime
     host:port 取 bootstrap_servers 首个 host:port（sidecar 网络层经宿主
-    传输层出口拨号；无隧道时同值直连）。
+    传输层出口拨号；无隧道时同值直连）。runtime_extra 允许用例模拟宿主
+    注入的扩展 runtime 字段（如 S18 的 structured proxy route）。
     """
     bootstrap = str((connection.get("external_config") or {}).get("bootstrap_servers", ""))
     first = bootstrap.replace(",", " ").split()[0] if bootstrap.strip() else ""
     host, _, port = first.partition(":")
+    runtime: dict = {"host": host, "port": int(port) if port.isdigit() else 9092}
+    if runtime_extra:
+        runtime.update(runtime_extra)
     return {
         "provider": {"id": "io.dbx.kafka.connection", "databaseType": "kafka"},
         "connection": connection,
-        "runtime": {"host": host, "port": int(port) if port.isdigit() else 9092},
+        "runtime": runtime,
     }
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Container orchestration for the Kafka smoke test (scenarios S1-S17).
+"""Container orchestration for the Kafka smoke test (scenarios S1-S18).
 
 Wraps docker-compose.kafka-test.yml (apache/kafka KRaft single node on
 127.0.0.1:9092):
