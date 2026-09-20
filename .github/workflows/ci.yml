@@ -58,7 +58,13 @@ jobs:
       - run: pnpm --dir frontend typecheck
       - run: pnpm --dir frontend test
       - run: pnpm --dir frontend build
+      # ui/ is integrator-owned (agent-flow.yml ownership.integrator), so
+      # implementation PRs must not be forced to carry the generated bundle.
+      # Enforce freshness only outside PRs: after a frontend PR lands without
+      # ui/, this goes red on main and the integrator regenerates and commits
+      # the bundle. Never hand-merge ui/ conflicts — re-run the build.
       - name: Committed ui/ output is fresh
+        if: github.event_name != 'pull_request'
         run: |
           if ! git diff --quiet -- ui/; then
             git diff --stat -- ui/
