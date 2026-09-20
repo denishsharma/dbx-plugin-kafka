@@ -3,15 +3,14 @@
  * 二次 decode/format 视图、headers 表格/JSON 切换、区块折叠，以及抽屉
  * Esc 关闭 + Tab 焦点陷阱 + 开关焦点归还的 DOM 接线。
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, type Ref } from "vue";
 import type { DecodeMode, Decompression } from "../lib/api";
 import { formatMessageValue, looksLikeJson, looksLikeXml, messageFullValueText, type DecodedValue, type ValueFormat } from "../lib/messageCodec";
 import { decideModalKeydown, focusableElements } from "../lib/modalBehavior";
 import type { KafkaMessage } from "../lib/api";
 
-export function useMessageDetailDrawer() {
+export function useMessageDetailDrawer(detail: Ref<KafkaMessage | null> = shallowRef(null)) {
   // 详情 raw 单份存储：直接引用行内 raw（与 result.messages 同一对象，不拷贝）。
-  const detail = shallowRef<KafkaMessage | null>(null);
 
   const viewFormat = ref<ValueFormat>("raw");
   const viewDecode = ref<DecodeMode>("none");

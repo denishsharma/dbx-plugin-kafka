@@ -8,6 +8,7 @@
 // 空实现（autoScroll 落表调用），quickFilter 以 data 属性透出供断言。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
+import MessageDetailDrawer from "./MessageDetailDrawer.vue";
 import StreamPanel from "./StreamPanel.vue";
 import { setKafkaConnectionId, type KafkaMessage, type KafkaStreamErrorEvent, type KafkaStreamMessagesEvent } from "../lib/api";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
@@ -22,7 +23,7 @@ vi.mock("./DbxAgGrid.vue", () => ({
       goToLatest() {},
     },
     template: `<div class="dbx-grid-stub" :data-filter="quickFilter ?? ''">
-      <span v-for="row in rowData" :key="row.id" class="stub-row">{{ row.valueText }}</span>
+      <span v-for="row in rowData" :key="row.id" class="stub-row" @click="emitRowClick !== false && $emit('rowClick', row)">{{ row.valueText }}</span>
     </div>`,
   },
 }));
@@ -55,6 +56,7 @@ function message(offset: number, valueText: string): KafkaMessage {
 function mountPanel(props: Record<string, unknown> = {}) {
   const wrapper = mount(StreamPanel, {
     props: { topic: "order-events", canWrite: true, ...props },
+    global: { stubs: { teleport: true, CodeEditor: { props: ["modelValue"], template: `<pre class="editor-stub">{{ modelValue }}</pre>` } } },
   });
   mounted.push(wrapper);
   return wrapper;
@@ -322,4 +324,33 @@ describe("StreamPanel export (Lane4)", () => {
     expect(invokeMock.mock.calls.filter(([method]) => method === "kafka/stream/start")).toHaveLength(1);
     expect(invokeMock.mock.calls.filter(([method]) => String(method).includes("export"))).toHaveLength(0);
   });
+});
+
+it("opens full stream details and keeps the selected message after buffer eviction", async () => {
+  installBridge({ "kafka/stream/start": { sessionId: "stream-1" } });
+  const wrapper = mountPanel();
+  await startSession(wrapper);
+  const full = JSON.stringify({ payload: "消息".repeat(300), tail: "COMPLETE" });
+  const selected = { ...message(1, "preview…"), valueBase64: btoa(unescape(encodeURIComponent(full))), headers: { trace: "original" } };
+  const push = (messages: KafkaMessage[]) => pushEvent(wrapper, { sessionId: "stream-1", messages, totalScanned: messages.length, totalMatched: messages.length, paused: false, bufferSize: messages.length });
+  push([selected]);
+  await flushPromises();
+  await stubRows(wrapper)[0].trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".drawer").exists()).toBe(true);
+  expect(JSON.parse(wrapper.find(".editor-stub").text())).toEqual(JSON.parse(full));
+  push(Array.from({ length: 1001 }, (_, i) => ({ ...message(i + 2, "new record"), valueBase64: btoa("new record") })));
+  await flushPromises();
+  expect(stubRows(wrapper)).toHaveLength(1000);
+  expect(wrapper.findComponent(MessageDetailDrawer).props("modelValue")).toEqual(selected);
+  expect(wrapper.find(".drawer").text()).toContain("original");
+  await wrapper.find(".drawer-backdrop").trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".drawer").exists()).toBe(false);
+  await stubRows(wrapper)[0].trigger("click");
+  await flushPromises();
+  expect(wrapper.find(".editor-stub").text()).toBe("new record");
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  await flushPromises();
+  expect(wrapper.find(".drawer").exists()).toBe(false);
 });

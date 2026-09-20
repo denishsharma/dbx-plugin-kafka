@@ -8,14 +8,17 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { ColDef } from "ag-grid-community";
 import { Download, Pause, Play, Square } from "@lucide/vue";
 import DbxAgGrid from "./DbxAgGrid.vue";
+import MessageDetailDrawer from "./MessageDetailDrawer.vue";
 import { kafkaApi, type KafkaMessage, type KafkaStreamErrorEvent, type KafkaStreamMessagesEvent, type MatchMode, type OffsetStrategy, type SchemaAttach, type SchemaFormat, type SchemaSubject, type StreamStatus } from "../lib/api";
 import { appendStreamRows, debounce } from "../lib/uiHelpers";
 import { serializeMessagesToCsv, serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
-import { MINIMAL_MESSAGE_FIELDS, messageColumns, toMessageRows, workbenchTimestampTz, type MessageRow } from "../lib/kafkaColumns";
+import { messageCellCopyText, MINIMAL_MESSAGE_FIELDS, messageColumns, toMessageRows, workbenchTimestampTz, type MessageRow } from "../lib/kafkaColumns";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";
 
 const MAX_ROWS = 1000;
+// Hold the selected message independently of stream buffer replacement/eviction.
+const detail = shallowRef<KafkaMessage | null>(null);
 
 const props = defineProps<{
   topic: string;
@@ -130,6 +133,7 @@ async function start() {
     });
     sessionId.value = response.sessionId;
     sessionTopic.value = props.topic;
+    detail.value = null;
     rows.value = [];
     rebuildMessageRows();
     droppedRows.value = 0;
@@ -447,9 +451,11 @@ defineExpose({ pushEvent });
         :column-defs="messageCols"
         :compact-fields="MINIMAL_MESSAGE_FIELDS"
         :quick-filter="quickFilter"
-        :emit-row-click="false"
+        :cell-copy-text="messageCellCopyText"
+        @row-click="(row: unknown) => detail = (row as MessageRow).raw"
       />
     </div>
+    <MessageDetailDrawer v-model="detail" @notify="emit('notify', $event)" @error="emit('error', $event)" />
   </section>
 </template>
 
