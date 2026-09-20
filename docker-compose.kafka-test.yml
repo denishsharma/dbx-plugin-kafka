@@ -31,7 +31,10 @@
 # no password env vars exist here.
 services:
   kafka-test:
-    image: apache/kafka:latest
+    # Pinned (not :latest) so CI smoke results stay deterministic; override
+    # via KAFKA_TEST_IMAGE when verifying an upgrade. smoke_container.py's
+    # keytool one-shot reads the same variable — keep them on one version.
+    image: ${KAFKA_TEST_IMAGE:-apache/kafka:4.3.1}
     container_name: dbx-kafka-test
     ports:
       - "9092:9092"
@@ -76,7 +79,7 @@ services:
       - "19081:8081"
 
   kafka-sasl-test:
-    image: apache/kafka:latest
+    image: ${KAFKA_TEST_IMAGE:-apache/kafka:4.3.1}
     container_name: dbx-kafka-sasl-test
     ports:
       - "29092:29092"
@@ -114,7 +117,7 @@ services:
       KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
 
   kafka-tls-test:
-    image: apache/kafka:latest
+    image: ${KAFKA_TEST_IMAGE:-apache/kafka:4.3.1}
     container_name: dbx-kafka-tls-test
     ports:
       - "30092:30092"

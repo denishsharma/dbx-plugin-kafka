@@ -42,6 +42,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = REPO / "docker-compose.kafka-test.yml"
+# 与 docker-compose.kafka-test.yml 的 ${KAFKA_TEST_IMAGE:-...} 默认值保持一致;
+# 钉版本而非 :latest,保证冒烟结果不随上游镜像重指向而漂移。
+KAFKA_TEST_IMAGE = os.environ.get("KAFKA_TEST_IMAGE") or "apache/kafka:4.3.1"
 # Fixed container_name values from docker-compose.kafka-test.yml. A leftover
 # container from an interrupted/kept run (or from a sibling compose project)
 # blocks `compose up` with a name conflict, so they are force-removed first.
@@ -220,7 +223,7 @@ def generate_tls_secrets(secrets_dir: Path) -> None:
         path.chmod(0o644)
     trust = subprocess.run(
         ["docker", "run", "--rm", "-v", f"{secrets_dir}:/work:ro", "--entrypoint", "sh",
-         "apache/kafka:latest", "-c",
+         KAFKA_TEST_IMAGE, "-c",
          "keytool -importcert -alias ca -file /work/ca.pem -keystore /tmp/truststore.p12 "
          f"-storetype PKCS12 -storepass '{TLS_STORE_PASSWORD}' -noprompt >/dev/null && base64 /tmp/truststore.p12"],
         capture_output=True,
