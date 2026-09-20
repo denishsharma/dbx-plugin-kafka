@@ -15,6 +15,7 @@ import { kafkaApi, type ConsumeResult, type KafkaMessage, type KafkaTopic, type 
 import type { MessageRow } from "../lib/kafkaColumns";
 import { messageCellCopyText, MINIMAL_MESSAGE_FIELDS } from "../lib/kafkaColumns";
 import { serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
+import { saveTextFile, type SaveFileOutcome } from "../lib/download";
 import { copyTextToClipboard } from "../lib/uiHelpers";
 import { nowDatetimeLocal, validateConsumeForm } from "../lib/consumeForm";
 import { positiveInt, useConsumeForm } from "../composables/useConsumeForm";
@@ -340,8 +341,7 @@ async function exportMessages(format: "json" | "csv" | "tsv") {
   // TSV 走前端序列化——直接导出当前已加载结果行（复用 messageExport 的保真
   // value 文本与 TSV 转义；列序/行分隔与后端 CSV 一致），不发额外请求。
   if (format === "tsv") {
-    downloadText("kafka-messages.tsv", "text/tab-separated-values", serializeMessagesToTsv(result.value.messages));
-    emit("notify", t("messages.exportDone", { name: "TSV" }));
+    await saveExport("kafka-messages.tsv", "text/tab-separated-values", serializeMessagesToTsv(result.value.messages), "TSV");
     return;
   }
   try {
@@ -350,22 +350,16 @@ async function exportMessages(format: "json" | "csv" | "tsv") {
       format,
       limit: Math.max(result.value.messages.length, positiveInt(limit.value, 100), 1),
     });
-    downloadText(response.filename || `kafka-messages.${format}`, response.contentType, response.content);
-    emit("notify", t("messages.exportDone", { name: format.toUpperCase() }));
+    await saveExport(response.filename || `kafka-messages.${format}`, response.contentType, response.content, format.toUpperCase());
   } catch (cause) {
     emit("error", cause instanceof Error ? cause.message : String(cause));
   }
 }
 
-function downloadText(name: string, contentType: string, text: string) {
-  // Host API 1.0 无 save-file 桥，Blob URL 下载为约定兜底。
-  const blob = new Blob([text], { type: `${contentType};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+/** 保存导出内容（宿主另存为优先/网页下载兜底，见 lib/download）；用户取消另存为不提示成功。 */
+async function saveExport(name: string, contentType: string, content: string, label: string) {
+  const outcome = await saveTextFile(name, contentType, content);
+  if (outcome.mode !== "canceled") emit("notify", t("messages.exportDone", { name: label }));
 }
 
 // topic 切换后清空旧结果（跨 topic 结果混排会误导）；无开合记忆时回到默认展开

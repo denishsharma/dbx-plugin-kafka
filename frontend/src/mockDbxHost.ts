@@ -11,6 +11,8 @@
  *   ?ro=1                readOnly connection（写操作先发 denied kafka/audit 事件
  *                        再抛错，镜像后端 policy.go 分支）
  *   ?nodelete=1          allowDelete=false（删除类额外拒绝）
+ *   ?nosave=1            模拟旧宿主（无 saveFile 桥）：导出走 Blob 网页下载兜底；
+ *                        默认镜像桌面端 v0.6.14+ 的 host.saveFile 另存为桥
  *   ?glue=1              Glue-only 模式：statuses.provider=glue、仅 Glue subjects、
  *                        confluent 探测返回 none、schema 挂载 -32000 拒绝
  *                        （默认模式 = Confluent + Glue 双 registry 配置，可切换）
@@ -1193,6 +1195,29 @@ window.dbxPlugin = {
   },
   workbenchState: { set: async () => undefined },
   clipboard: { readText: async () => "", writeText: async () => undefined },
+  // 宿主另存为桥（桌面端 v0.6.14+）：mock 镜像宿主 Web 模式行为——宿主页
+  // 发起 anchor 下载并回 { path }；?nosave=1 时不挂该成员模拟旧宿主（导出
+  // 落到 lib/download 的 Blob 网页下载兜底）。
+  ...(params.get("nosave") === "1"
+    ? {}
+    : {
+        saveFile: async (options: { fileName?: string; contentType?: string }, data: Uint8Array | ArrayBuffer | string): Promise<{ path: string } | null> => {
+          const bytes =
+            typeof data === "string"
+              ? Uint8Array.from(atob(data), (character) => character.charCodeAt(0))
+              : data instanceof Uint8Array
+                ? data
+                : new Uint8Array(data);
+          const blob = new Blob([new TextDecoder().decode(bytes)], { type: `${options.contentType || "application/octet-stream"};charset=utf-8` });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = options.fileName || "download.bin";
+          anchor.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+          return { path: options.fileName || "download.bin" };
+        },
+      }),
 };
 
 // 走查注入：ui_test 经 window.dbxPlugin.emitKafkaUiIntent 发 kafka/ui/intent

@@ -12,6 +12,7 @@ import MessageDetailDrawer from "./MessageDetailDrawer.vue";
 import { kafkaApi, type KafkaMessage, type KafkaStreamErrorEvent, type KafkaStreamMessagesEvent, type MatchMode, type OffsetStrategy, type SchemaAttach, type SchemaFormat, type SchemaSubject, type StreamStatus } from "../lib/api";
 import { appendStreamRows, debounce } from "../lib/uiHelpers";
 import { serializeMessagesToCsv, serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
+import { saveTextFile } from "../lib/download";
 import { messageCellCopyText, MINIMAL_MESSAGE_FIELDS, messageColumns, toMessageRows, workbenchTimestampTz, type MessageRow } from "../lib/kafkaColumns";
 import { friendlyKafkaError } from "../lib/kafkaErrors";
 import { t } from "../lib/i18n";
@@ -283,28 +284,17 @@ function positiveInt(value: unknown, fallback: number): number {
 }
 
 // -- 导出（Lane4 打磨）：把当前已加载/缓冲内行导出为 JSON/CSV/TSV。纯前端
-// 序列化（复用 MessagesPanel 同款 kafkaModel 序列化器 + Blob 下载兜底），
-// 不触发任何消费请求；行分隔/转义与 MessagesPanel 的 CSV 一致，TSV 用
-// 制表符转义（见 kafkaModel.tsvEscape）。
+// 序列化（复用 MessagesPanel 同款 kafkaModel 序列化器 + lib/download 保存：
+// 宿主另存为优先、网页下载兜底），不触发任何消费请求；行分隔/转义与
+// MessagesPanel 的 CSV 一致，TSV 用制表符转义（见 kafkaModel.tsvEscape）。
 
-function downloadText(name: string, contentType: string, text: string) {
-  // Host API 1.0 无 save-file 桥，Blob URL 下载为约定兜底（MessagesPanel 同款）。
-  const blob = new Blob([text], { type: `${contentType};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-function exportRows(format: "json" | "csv" | "tsv") {
+async function exportRows(format: "json" | "csv" | "tsv") {
   if (rows.value.length === 0) return;
   const content =
     format === "json" ? serializeMessagesToJson(rows.value) : format === "csv" ? serializeMessagesToCsv(rows.value) : serializeMessagesToTsv(rows.value);
   const contentType = format === "tsv" ? "text/tab-separated-values" : format === "csv" ? "text/csv" : "application/json";
-  downloadText(`${props.topic || "kafka-stream"}.${format}`, contentType, content);
-  emit("notify", t("messages.exportDone", { name: format.toUpperCase() }));
+  const outcome = await saveTextFile(`${props.topic || "kafka-stream"}.${format}`, contentType, content);
+  if (outcome.mode !== "canceled") emit("notify", t("messages.exportDone", { name: format.toUpperCase() }));
 }
 
 defineExpose({ pushEvent });

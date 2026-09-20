@@ -82,6 +82,12 @@ interface DbxPluginApi {
   onAppearanceChange?(listener: (appearance: DbxPluginAppearance) => void): () => void;
   onLocaleChange?(listener: (locale: string) => void): () => void;
   onContextChange?(listener: (context: Record<string, unknown>) => void): () => void;
+  /**
+   * 宿主另存为桥（桌面端 v0.6.14+；旧宿主缺省，走网页下载兜底）。
+   * data 为二进制 transfer；string 按宿主桥约定视为 base64（避免误传明文）。
+   * 返回 { path }（已写盘）或 null（用户取消对话框）。
+   */
+  saveFile?(options: { fileName?: string; contentType?: string }, data: Uint8Array | ArrayBuffer | string): Promise<{ path: string } | null>;
   decodeBase64(value: string): Uint8Array;
   encodeBase64(value: Uint8Array | ArrayBuffer): string;
   readonly fileTransfer?: DbxPluginFileTransferApi;

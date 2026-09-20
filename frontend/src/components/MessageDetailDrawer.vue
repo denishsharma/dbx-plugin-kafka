@@ -5,6 +5,7 @@ import type { KafkaMessage } from "../lib/api";
 import { workbenchTimestampTz } from "../lib/kafkaColumns";
 import { messageFullValueText } from "../lib/messageCodec";
 import { serializeMessagesToJson } from "../lib/messageExport";
+import { saveTextFile } from "../lib/download";
 import { formatTimestamp, timestampIso } from "../lib/timestamps";
 import { copyTextToClipboard } from "../lib/uiHelpers";
 import { useMessageDetailDrawer } from "../composables/useMessageDetailDrawer";
@@ -47,22 +48,11 @@ function copyDetail(part: "key" | "value" | "headers" | "json") {
   else void copyWithNotify(messageJsonText(message));
 }
 
-function downloadText(name: string, contentType: string, text: string) {
-  // Host API 1.0 无 save-file 桥，Blob URL 下载为约定兜底。
-  const blob = new Blob([text], { type: `${contentType};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-
-function downloadValue() {
+async function downloadValue() {
   const message = detail.value;
   if (!message) return;
-  downloadText(`${message.topic}-p${message.partition}-o${message.offset}.txt`, "text/plain", messageFullValueText(message));
+  const outcome = await saveTextFile(`${message.topic}-p${message.partition}-o${message.offset}.txt`, "text/plain", messageFullValueText(message));
+  if (outcome.mode !== "canceled") emit("notify", t("messages.exportDone", { name: "TXT" }));
 }
 
 
