@@ -7,20 +7,18 @@
 // 布局压缩（R 路）：有结果后表单默认收起为一行摘要 chips 条（开合记忆
 // dbx.kafka.ui.msgFormOpen），结果表格吃满剩余高度；大数据量防护见各标注。
 import { nextTick, ref, watch } from "vue";
-import { ChevronDown, ChevronsDown, Copy, Download, Play, Plus, Save, SlidersHorizontal, Trash2, X } from "@lucide/vue";
+import { ChevronDown, ChevronsDown, Download, Play, Plus, Save, SlidersHorizontal, Trash2, X } from "@lucide/vue";
+import { messageFullValueText } from "../lib/messageCodec";
 import DbxAgGrid from "./DbxAgGrid.vue";
-import CodeEditor from "./CodeEditor.vue";
+import MessageDetailDrawer from "./MessageDetailDrawer.vue";
 import { kafkaApi, type ConsumeResult, type KafkaMessage, type KafkaTopic, type MatchMode, type OffsetStrategy } from "../lib/api";
 import type { MessageRow } from "../lib/kafkaColumns";
-import { MINIMAL_MESSAGE_FIELDS } from "../lib/kafkaColumns";
-import { messageFullValueText } from "../lib/messageCodec";
+import { messageCellCopyText, MINIMAL_MESSAGE_FIELDS } from "../lib/kafkaColumns";
 import { serializeMessagesToJson, serializeMessagesToTsv } from "../lib/messageExport";
-import { formatTimestamp, timestampIso } from "../lib/timestamps";
 import { copyTextToClipboard } from "../lib/uiHelpers";
 import { nowDatetimeLocal, validateConsumeForm } from "../lib/consumeForm";
 import { positiveInt, useConsumeForm } from "../composables/useConsumeForm";
 import { useConsumeResults } from "../composables/useConsumeResults";
-import { useMessageDetailDrawer } from "../composables/useMessageDetailDrawer";
 import { t } from "../lib/i18n";
 import type { UiIntentOutcome, UiIntentSummary } from "../../../shared/frontend/uiIntent";
 
@@ -121,24 +119,9 @@ const formIssues = ref<string[]>([]);
 // 摘要 chips：策略文案映射（无新增 i18n key，复用既有 strategy*/formatRaw）。
 // 生效过滤条件数 / 分组开合 / 时间双模式：见 useConsumeForm（composable）。
 
-// -- 详情抽屉（useMessageDetailDrawer）+ 结果表（useConsumeResults）------------
+// -- 共享详情抽屉 + 结果表（useConsumeResults）------------
 
-const {
-  detail,
-  viewFormat,
-  viewDecode,
-  viewDecompression,
-  viewResult,
-  viewBusy,
-  showFullBase64,
-  headersView,
-  sectionsOpen,
-  headersEntries,
-  headersJsonText,
-  toggleSection,
-  renderView,
-  drawerEl,
-} = useMessageDetailDrawer();
+const detail = ref<KafkaMessage | null>(null);
 
 async function copyWithNotify(text: string) {
   const ok = await copyTextToClipboard(text);
@@ -154,14 +137,6 @@ function copyMessageJson(row: MessageRow) {
   void copyWithNotify(messageJsonText(row.raw));
 }
 
-function copyDetail(part: "key" | "value" | "headers" | "json") {
-  const message = detail.value;
-  if (!message) return;
-  if (part === "key") void copyWithNotify(message.key ?? "");
-  else if (part === "value") void copyWithNotify(messageFullValueText(message));
-  else if (part === "headers") void copyWithNotify(message.headers ? JSON.stringify(message.headers) : "");
-  else void copyWithNotify(messageJsonText(message));
-}
 // P1-1：结果区统计行锚点（消费后滚动目标）。
 const resultMetaEl = ref<HTMLElement | null>(null);
 // 消息表实例（跳到最新经 DbxAgGrid.goToLatest 走 gridApi：末页 + 滚入视口）。
@@ -391,16 +366,6 @@ function downloadText(name: string, contentType: string, text: string) {
   anchor.download = name;
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
-// -- detail drawer（useMessageDetailDrawer：视图状态/渲染/焦点陷阱在 composable）--
-// 编辑器直接承载全量解码/格式化文本（CodeMirror 虚拟渲染，16384 截断预览
-// 退役）——「所见即所复制」：copy-value 复制当前解码/格式化结果文本。
-
-function downloadValue() {
-  const message = detail.value;
-  if (!message) return;
-  downloadText(`${message.topic}-p${message.partition}-o${message.offset}.txt`, "text/plain", messageFullValueText(message));
 }
 
 // topic 切换后清空旧结果（跨 topic 结果混排会误导）；无开合记忆时回到默认展开
@@ -870,6 +835,7 @@ watch(() => props.topic, () => void loadPresets(), { immediate: true });
         ref="messagesGrid"
         table-key="messages"
         :row-data="messageRows"
+        :cell-copy-text="messageCellCopyText"
         :column-defs="messageCols"
         :compact-fields="MINIMAL_MESSAGE_FIELDS"
         :quick-filter="quickFilter"
@@ -890,130 +856,6 @@ watch(() => props.topic, () => void loadPresets(), { immediate: true });
       <p class="empty compact">{{ topic ? t("messages.noMessages") : t("messages.uiNoTopicSelected") }}</p>
     </div>
 
-    <teleport to="body">
-      <div v-if="detail" class="drawer-backdrop" @click="detail = null" />
-      <div v-if="detail" class="drawer" ref="drawerEl" tabindex="-1" role="dialog" aria-modal="true">
-        <header>
-          <span class="mono">{{ detail.topic }} · {{ t("messages.colPartition") }} {{ detail.partition }} · {{ t("messages.colOffset") }} {{ detail.offset }}</span>
-          <span class="drawer-head-actions">
-            <button class="icon-button" :title="t('messages.copyJson')" data-testid="copy-json" @click="copyDetail('json')"><Copy /></button>
-            <button class="icon-button" :title="t('close')" @click="detail = null"><X /></button>
-          </span>
-        </header>
-        <div class="drawer-body">
-          <dl class="kv-grid">
-            <dt>{{ t("messages.colTimestamp") }}</dt>
-            <dd :title="timestampIso(detail.timestamp)">{{ formatTimestamp(detail.timestamp, workbenchTimestampTz) }}</dd>
-            <dt>{{ t("messages.colKey") }}</dt>
-            <dd class="kv-dd-inline">
-              <span class="kv-dd-text" :title="detail.key ?? undefined">{{ detail.key ?? "—" }}</span>
-              <button v-if="detail.key" class="icon-button icon-button--inline" type="button" :title="t('messages.copyKey')" data-testid="copy-key" @click="copyDetail('key')"><Copy /></button>
-            </dd>
-            <dt v-if="detail.schemaSubject">{{ t("messages.colSchema") }}</dt>
-            <dd v-if="detail.schemaSubject" class="mono">{{ detail.schemaSubject }} v{{ detail.schemaVersion ?? "?" }} (id {{ detail.schemaId ?? "—" }})</dd>
-            <dt v-if="detail.decodeError">{{ t("messages.decodeError") }}</dt>
-            <dd v-if="detail.decodeError" class="form-error">{{ detail.decodeError }}</dd>
-          </dl>
-
-          <!-- Headers：可折叠区块（标题行右侧直接挂切换/复制操作，省一行高度）；
-               表格（key|value + 行复制，限高滚动）⇄ 格式化 JSON -->
-          <section class="detail-block">
-            <div class="detail-block__head">
-              <button class="detail-block__toggle" type="button" :aria-expanded="sectionsOpen.headers" @click="toggleSection('headers')">
-                <ChevronDown class="chev" :class="{ folded: !sectionsOpen.headers }" aria-hidden="true" />
-                <span class="detail-block__title">{{ t("messages.colHeaders") }} · {{ headersEntries.length }}</span>
-              </button>
-              <span v-if="sectionsOpen.headers && headersEntries.length > 0" class="detail-block__actions">
-                <button class="seg-toggle" type="button" :class="{ 'is-active': headersView === 'table' }" @click="headersView = 'table'">{{ t("messages.headersViewTable") }}</button>
-                <button class="seg-toggle" type="button" :class="{ 'is-active': headersView === 'json' }" @click="headersView = 'json'">{{ t("messages.headersViewJson") }}</button>
-                <button class="icon-button" type="button" :title="t('messages.copyHeaders')" data-testid="copy-headers" @click="copyDetail('headers')"><Copy /></button>
-              </span>
-            </div>
-            <div v-show="sectionsOpen.headers" class="detail-block__body">
-              <div v-if="headersView === 'table' && headersEntries.length > 0" class="kv-scroll">
-                <table class="kv-table">
-                  <thead>
-                    <tr>
-                      <th>{{ t("messages.colKey") }}</th>
-                      <th>Value</th>
-                      <th class="kv-table__action-col" aria-hidden="true"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="[headerKey, headerValue] in headersEntries" :key="headerKey">
-                      <td class="mono">{{ headerKey }}</td>
-                      <td class="kv-table__value" :title="headerValue">{{ headerValue }}</td>
-                      <td class="kv-table__action-col">
-                        <button class="icon-button icon-button--inline" type="button" :title="t('messages.copyHeaderValue')" @click="copyWithNotify(headerValue)"><Copy /></button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <pre v-else-if="headersView === 'json' && headersEntries.length > 0" class="value-view value-view--headers">{{ headersJsonText }}</pre>
-              <p v-else class="empty compact detail-headers-empty">{{ t("messages.headersEmpty") }}</p>
-            </div>
-          </section>
-
-          <!-- Value：可折叠区块（编辑器吃满抽屉剩余高度）；CodeEditor 只读高亮（json/xml）
-               + 解码管线 + 标题行右侧操作 icon -->
-          <section class="detail-block detail-block--value">
-            <div class="detail-block__head">
-              <button class="detail-block__toggle" type="button" :aria-expanded="sectionsOpen.value" @click="toggleSection('value')">
-                <ChevronDown class="chev" :class="{ folded: !sectionsOpen.value }" aria-hidden="true" />
-                <span class="detail-block__title">{{ t("messages.colValue") }}<span v-if="viewBusy" class="detail-block__busy">…</span></span>
-              </button>
-              <span v-if="sectionsOpen.value" class="detail-block__actions">
-                <button class="seg-toggle" type="button" :class="{ 'is-active': showFullBase64 }" :title="t('messages.fullValue')" @click="showFullBase64 = !showFullBase64">
-                  {{ showFullBase64 ? t("messages.formatRaw") : t("messages.fullValue") }}
-                </button>
-                <button class="icon-button" type="button" :title="t('messages.downloadValue')" @click="downloadValue"><Download /></button>
-                <button class="icon-button" type="button" :title="t('messages.copyValue')" data-testid="copy-value" @click="copyDetail('value')"><Copy /></button>
-              </span>
-            </div>
-            <div v-show="sectionsOpen.value" class="detail-block__body">
-              <div class="kafka-form kafka-form--bare detail-view-form">
-                <label class="field">
-                  <span>{{ t("messages.decode") }}</span>
-                  <select v-model="viewDecode" @change="renderView">
-                    <option value="none">none</option>
-                    <option value="base64">base64</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>{{ t("messages.decompression") }}</span>
-                  <select v-model="viewDecompression" @change="renderView">
-                    <option value="none">none</option>
-                    <option value="gzip">gzip</option>
-                    <option value="lz4">lz4</option>
-                    <option value="zstd">zstd</option>
-                    <option value="snappy">snappy</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>{{ t("messages.format") }}</span>
-                  <select v-model="viewFormat" @change="renderView">
-                    <option value="raw">{{ t("messages.formatRaw") }}</option>
-                    <option value="json">{{ t("messages.formatJson") }}</option>
-                    <option value="xml">XML</option>
-                    <option value="hex">{{ t("messages.formatHex") }}</option>
-                    <option value="bitset">{{ t("messages.formatBitset") }}</option>
-                  </select>
-                </label>
-              </div>
-              <pre v-if="viewResult.error" class="value-view error">{{ viewResult.error }}</pre>
-              <pre v-else-if="showFullBase64" class="value-view">{{ detail.valueBase64 ?? detail.valueText ?? "" }}</pre>
-              <CodeEditor
-                v-else
-                :model-value="viewResult.text"
-                :language="viewFormat === 'json' || viewFormat === 'xml' ? viewFormat : 'text'"
-                disabled
-                min-height="140px"
-              />
-            </div>
-          </section>
-        </div>
-      </div>
-    </teleport>
+    <MessageDetailDrawer v-model="detail" @notify="emit('notify', $event)" @error="emit('error', $event)" />
   </section>
 </template>

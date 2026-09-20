@@ -50,6 +50,8 @@ const props = withDefaults(
     rowClassRules?: GridOptions["rowClassRules"];
     /** 详情抽屉行点击才打开、选择仅做高亮时置 false。 */
     emitRowClick?: boolean;
+    /** Full cell text for copying when row fields contain display previews. */
+    cellCopyText?: (row: unknown, field: string | undefined, value: unknown) => string;
     /** 即时搜索（F6-1）：quickFilterText 只过滤已加载行（防抖在调用方）。 */
     quickFilter?: string;
     /** 行右键管理项；复制值/复制行始终由网格提供。 */
@@ -104,6 +106,7 @@ function rowText(row: unknown): string {
   return fields
     .map((field) => {
       const value = record[field];
+      if (props.cellCopyText) return props.cellCopyText(row, field, value);
       if (value === undefined || value === null) return "";
       return typeof value === "object" ? JSON.stringify(value) : String(value);
     })
@@ -129,7 +132,9 @@ function openContextMenu(event: Parameters<NonNullable<GridOptions["onCellContex
   if (!event.node?.data || !nativeEvent) return;
   nativeEvent.preventDefault();
   nativeEvent.stopPropagation();
-  const value = event.value === undefined || event.value === null ? "" : String(event.value);
+  const value = props.cellCopyText
+    ? props.cellCopyText(event.node.data, event.colDef.field, event.value)
+    : event.value === undefined || event.value === null ? "" : String(event.value);
   const menuWidth = 220;
   const menuHeight = 38 + (typeof props.contextMenuItems === "function" ? props.contextMenuItems(event.node.data).length : props.contextMenuItems?.length ?? 0) * 30;
   contextMenu.value = {

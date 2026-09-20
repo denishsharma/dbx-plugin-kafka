@@ -26,6 +26,7 @@ import type {
   TopicPartitionInfo,
 } from "./api";
 import { formatTimestamp, timestampFilterTextComparator, timestampIso, type TimestampTz } from "./timestamps";
+import { messageFullValueText } from "./messageCodec";
 import { headersPreview, previewText } from "./uiHelpers";
 import { t, workbenchLocale } from "./i18n";
 
@@ -998,4 +999,15 @@ const AG_LOCALE_TEXT: Record<string, AgLocaleText> = {
 /** 当前工作台 locale 对应的 ag-grid 内置文案（组件每次建表时读取，随 locale 切换重建）。 */
 export function agGridLocaleText(): AgLocaleText {
   return AG_LOCALE_TEXT[workbenchLocale.value] ?? AG_LOCALE_TEXT["zh-CN"];
+}
+
+/** Keep display previews out of both cell and row clipboard output. */
+export function messageCellCopyText(row: unknown, field: string | undefined, value: unknown): string {
+  const message = (row as MessageRow | null)?.raw;
+  if (message) {
+    if (field === "valueText") return messageFullValueText(message);
+    if (field === "keyText") return message.key ?? "";
+    if (field === "headersText") return JSON.stringify(message.headers ?? {});
+  }
+  return value == null ? "" : typeof value === "object" ? JSON.stringify(value) : String(value);
 }

@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import DbxAgGrid from "./DbxAgGrid.vue";
 import type { GridContextMenuItem } from "./DbxAgGrid.vue";
-import { GRID_COMPACT_WIDTH } from "../lib/kafkaColumns";
+import { messageCellCopyText, toMessageRows, GRID_COMPACT_WIDTH } from "../lib/kafkaColumns";
 import type { ColDef, GridOptions } from "ag-grid-community";
 
 // -- ag-grid-community mock（捕获 options 与假 GridApi） ------------------------------
@@ -184,4 +184,29 @@ describe("DbxAgGrid", () => {
     await manageButton!.trigger("click");
     expect(manage).toHaveBeenCalledWith(row);
   });
+});
+
+it("copies full message cells and rows instead of truncated previews", async () => {
+  const full = "VALUE".repeat(500) + "TAIL";
+  const key = "KEY".repeat(100);
+  const headers = { long: "HEADER".repeat(100) };
+  const [messageRow] = toMessageRows([{ topic: "test", partition: 0, offset: 1, timestamp: 0, key, valueText: "backend preview…", valueBase64: btoa(full), headers }]);
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  const wrapper = mountGrid({ rowData: [messageRow], columnDefs: [{ field: "keyText" }, { field: "valueText" }, { field: "headersText" }], cellCopyText: messageCellCopyText });
+  try {
+    for (const [field, expected] of [["valueText", full], ["keyText", key], ["headersText", JSON.stringify(headers)]]) {
+      gridMock.created[0].options.onCellContextMenu?.({ node: { data: messageRow }, colDef: { field }, value: messageRow[field as keyof typeof messageRow], event: new MouseEvent("contextmenu") } as never);
+      await wrapper.vm.$nextTick();
+      await wrapper.findAll(".context-menu button")[0].trigger("click");
+      expect(writeText).toHaveBeenLastCalledWith(expected);
+    }
+    gridMock.created[0].options.onCellContextMenu?.({ node: { data: messageRow }, colDef: { field: "valueText" }, value: messageRow.valueText, event: new MouseEvent("contextmenu") } as never);
+    await wrapper.vm.$nextTick();
+    await wrapper.findAll(".context-menu button")[1].trigger("click");
+    expect(writeText).toHaveBeenLastCalledWith([key, full, JSON.stringify(headers)].join("\t"));
+  } finally {
+    wrapper.unmount();
+    vi.unstubAllGlobals();
+  }
 });
