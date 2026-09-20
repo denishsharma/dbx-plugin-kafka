@@ -562,21 +562,21 @@ button:disabled { filter: grayscale(.4); }
 /* 网格内部与数据列表滚动区是仅有的保留原生滚动条的工作区。全局工作台会隐藏
    滚动条，若不在这些容器恢复，数据多于视口时只能靠滚轮摸索，尤其触控板/键盘
    用户无法判断还有未见行（.dbx-grid 例外既有同一理由，现统一到数据列表区：
-   树行/结果行/消息行/headers 表/连接设置体）。样式细窄、与 DBX 令牌一致。 */
+   树行/结果行/消息行/headers 表/连接设置体/审计列表）。样式细窄、与 DBX 令牌一致。 */
 .dbx-grid,
 .dbx-grid *,
-:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body) {
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body, .audit-list) {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent) transparent;
 }
 .dbx-grid *::-webkit-scrollbar,
-:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body, .audit-list)::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
 .dbx-grid *::-webkit-scrollbar-track,
-:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-track { background: transparent; }
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body, .audit-list)::-webkit-scrollbar-track { background: transparent; }
 .dbx-grid *::-webkit-scrollbar-thumb,
-:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted-foreground) 55%, transparent); background-clip: padding-box; }
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body, .audit-list)::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--muted-foreground) 55%, transparent); background-clip: padding-box; }
 .dbx-grid *::-webkit-scrollbar-thumb:hover,
-:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body)::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground)); background-clip: padding-box; }
+:is(.tree-rows, .vlist, .result-rows, .kafka-table-rows, .kv-scroll, .settings-body, .audit-list)::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground)); background-clip: padding-box; }
 /* 行内单元格/行级状态（健康列、Monitor 阈值告警行高亮） */
 .dbx-cell-ok { color: var(--success); }
 .dbx-cell-bad { color: var(--destructive); }
@@ -704,6 +704,33 @@ button:disabled { filter: grayscale(.4); }
 .tree-star:hover { color: var(--primary); }
 .tree-star.is-fav { color: var(--primary); }
 .tree-star.is-fav svg { fill: currentColor; }
+
+/* === 审计日志条（AuditFeedPanel）：底部常驻折叠条 + 可展开事件列表 ============ */
+/* 折叠态一行摘要（chevron+图标+标题+计数，计数弱化右随），列表内部自滚（约 7 行
+   上限）不挤压上方面板；结果徽标沿用 .badge-* 混色配方（状态色向前景混提对比），
+   ok 色板照 .icon-emerald 的 light-dark 先例（--success 本仓库未定义）。 */
+.audit-feed { flex: 0 0 auto; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--background) 96%, var(--muted)); }
+.audit-feed-denied { border-top-color: color-mix(in srgb, var(--destructive) 45%, var(--border)); }
+.audit-header { display: flex; min-height: 30px; align-items: center; gap: 2px; padding: 2px var(--space-2); }
+.audit-toggle { display: inline-flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 6px; border: 0; border-radius: 4px; padding: 3px 6px; background: transparent; color: var(--foreground); text-align: left; cursor: pointer; }
+.audit-toggle:hover:not(:disabled) { background: var(--accent); }
+.audit-toggle svg { width: 13px; height: 13px; flex: 0 0 13px; stroke-width: 1.7; color: var(--muted-foreground); }
+.audit-title { flex: 0 0 auto; font-size: 11px; font-weight: 600; }
+.audit-summary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.audit-summary-denied { color: color-mix(in srgb, var(--destructive) 70%, var(--foreground)); }
+.audit-clear { display: inline-grid; width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border: 0; border-radius: 4px; padding: 0; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.audit-clear:hover { background: color-mix(in srgb, var(--destructive) 16%, transparent); color: var(--destructive); }
+.audit-clear svg { width: 13px; height: 13px; }
+.audit-list { max-height: 182px; margin: 0; overflow-y: auto; padding: 0 0 var(--space-2); list-style: none; }
+.audit-item { display: flex; min-height: 26px; align-items: center; gap: 8px; padding: 1px 14px; }
+.audit-item-denied, .audit-item-error { background: color-mix(in srgb, var(--destructive) 10%, transparent); }
+.audit-time { flex: 0 0 auto; color: var(--muted-foreground); font-family: var(--mono-font-family); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.audit-badge { flex: 0 0 auto; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; font-size: 10px; }
+.audit-badge-ok { border-color: color-mix(in srgb, #10b981 55%, var(--border)); color: light-dark(#047857, #6ee7b7); }
+.audit-badge-denied, .audit-badge-error { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); color: color-mix(in srgb, var(--destructive) 78%, var(--foreground)); }
+.audit-badge-error { background: color-mix(in srgb, var(--destructive) 14%, transparent); }
+.audit-action { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono-font-family); font-size: 10.5px; }
+.audit-target { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); font-family: var(--mono-font-family); font-size: 10.5px; }
 
 /* 系统要求减少动效时停用装饰性过渡/动画（hover 过渡、chev 旋转、加载转圈、
    flow 呼吸点——含组件 scoped 层的同类声明），信息仍由文字与静态状态传达。 */
